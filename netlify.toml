@@ -2,6 +2,16 @@
   command = "npm run build"
   publish = "dist"
 
+# Public/non-sensitive variables can be in netlify.toml
+[variables]
+  APP_BASE_URL = "https://your-netlify-domain.netlify.app"
+  VITE_STRAVA_CLIENT_ID = "set-in-netlify-dashboard"
+  STRAVA_CLIENT_ID = "set-in-netlify-dashboard"
+
+# Secrets that must be set ONLY in Netlify Dashboard:
+# - STRAVA_CLIENT_SECRET (server-side only, never use VITE_ prefix)
+# Site settings → Build & deploy → Environment → Environment variables
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
