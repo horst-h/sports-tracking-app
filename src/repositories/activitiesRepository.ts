@@ -1,7 +1,6 @@
 import { openSportsDB } from "./db";
 import type { Activity } from "../domain/activity";
 
-const DB_NAME = "sports-tracking";
 const STORE = "activitiesByYear";
 
 type CachedYearActivities = {
