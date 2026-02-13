@@ -2,15 +2,6 @@
   command = "npm run build"
   publish = "dist"
 
-[build.environment]
-  # These secrets MUST be configured in Netlify Dashboard:
-  # Site settings → Build & deploy → Environment → Environment variables
-  # Names below must match exactly what you set in the dashboard
-  STRAVA_CLIENT_ID = "placeholder"
-  STRAVA_CLIENT_SECRET = "placeholder"
-  APP_BASE_URL = "placeholder"
-  VITE_STRAVA_CLIENT_ID = "placeholder"
-
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
