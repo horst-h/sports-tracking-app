@@ -7,7 +7,7 @@
 # - VITE_STRAVA_CLIENT_ID (public client ID for OAuth, safe to expose)
 # Without this, Netlify scanner flags them as secrets and blocks the build
 [build.environment]
-  SECRETS_SCAN_OMIT_KEYS = "STRAVA_CLIENT_SECRET,VITE_STRAVA_CLIENT_ID"
+  SECRETS_SCAN_OMIT_KEYS = "STRAVA_CLIENT_SECRET,VITE_STRAVA_CLIENT_ID,STRAVA_CLIENT_ID"
 
 # Public/non-sensitive variables can be in netlify.toml
 [variables]
