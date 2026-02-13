@@ -2,12 +2,12 @@
   command = "npm run build"
   publish = "dist"
 
-# Ignore STRAVA_CLIENT_SECRET from secrets scan because:
-# 1. It's server-side only (used in netlify/functions, not in client code)
-# 2. It's not embedded into the client bundle (no VITE_ prefix)
-# 3. Netlify Functions can still access it at runtime from process.env
+# Ignore these keys from secrets scan:
+# - STRAVA_CLIENT_SECRET (server-side only, not in client bundle)
+# - VITE_STRAVA_CLIENT_ID (public client ID for OAuth, safe to expose)
+# Without this, Netlify scanner flags them as secrets and blocks the build
 [build.environment]
-  SECRETS_SCAN_OMIT_KEYS = "STRAVA_CLIENT_SECRET"
+  SECRETS_SCAN_OMIT_KEYS = "STRAVA_CLIENT_SECRET,VITE_STRAVA_CLIENT_ID"
 
 # Public/non-sensitive variables can be in netlify.toml
 [variables]
