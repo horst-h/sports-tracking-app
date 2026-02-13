@@ -1,7 +1,7 @@
 import { openDB } from "idb";
 
 const DB_NAME = "sports-tracking";
-const DB_VERSION = 2;
+const DB_VERSION = 3;  // Bump version to trigger upgrade callback in browsers with old DB
 
 /**
  * Centralized IndexedDB initialization.
