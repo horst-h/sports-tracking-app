@@ -3,5 +3,12 @@
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }
-  ]
+  ],
+  "ts-node": {
+    "esm": true,
+    "experimentalEsm": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "skipIgnore": true
+  }
 }
