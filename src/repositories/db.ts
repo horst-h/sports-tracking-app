@@ -1,7 +1,7 @@
 import { openDB } from "idb";
 
 const DB_NAME = "sports-tracking";
-const DB_VERSION = 3;  // Bump version to trigger upgrade callback in browsers with old DB
+const DB_VERSION = 4;  // Bump version to trigger upgrade callback in browsers with old DB
 
 /**
  * Centralized IndexedDB initialization.
@@ -18,6 +18,11 @@ export async function openSportsDB() {
       // Create "activitiesByYear" store for cached activities
       if (!db.objectStoreNames.contains("activitiesByYear")) {
         db.createObjectStore("activitiesByYear");
+      }
+
+      // Create "goals" store for yearly training goals (keyed by year)
+      if (!db.objectStoreNames.contains("goals")) {
+        db.createObjectStore("goals");
       }
     },
   });
