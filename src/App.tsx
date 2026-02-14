@@ -1,173 +1,161 @@
-import { useEffect, useState } from "react";
-import { useAuth } from "./hooks/useAuth";
-import { useActivities } from "./hooks/useActivities";
-import LoggedInActions from "./components/LoggedInActions";
-import { startStravaLogin } from "./services/auth";
-import DebugPanel from "./components/DebugPanel";
+import { useEffect, useMemo, useState } from "react";
 
-import type { YearDashboard } from "./services/statsService";
-import { buildYearDashboardNow } from "./services/statsService";
-import type { ForecastMode } from "./domain/metrics/uiStats";
+import AppHeader from "./components/AppHeader";
+import SportSwitcher from "./components/SportSwitcher";
+import YearlyDistanceGoalCard from "./components/YearlyDistanceGoalCard";
+import YearlyCountGoalCard from "./components/YearlyCountGoalCard";
+import YearlyElevationGoalCard from "./components/YearlyElevationGoalCard";
+import BottomDrawer from "./components/BottomDrawer";
+import GoalsSettingsForm from "./components/GoalsSettingsForm";
+
+import type { Sport, YearGoals } from "./domain/metrics/types";
+import type { UiAthleteStats, ForecastMode } from "./domain/metrics/uiStats";
+import { normalizeActivities } from "./domain/metrics/normalize";
+import { aggregateYear } from "./domain/metrics/aggregate";
+import { buildUiAthleteStats } from "./domain/metrics/uiStats";
+
+import { useActivities } from "./hooks/useActivities";
+import * as goalsRepo from "./repositories/goalsRepository";
+
+function formatHeaderDate(d: Date) {
+  return d.toDateString();
+}
+
+function toStravaLike(a: any) {
+  if (!a || typeof a !== "object") return a;
+
+  // already Strava-like
+  if (typeof a.type === "string" && typeof a.start_date_local === "string" && typeof a.distance === "number") {
+    return a;
+  }
+
+  // domain-like (your cached activities)
+  if (
+    (a.sport === "run" || a.sport === "ride") &&
+    typeof a.startDate === "string" &&
+    typeof a.distanceKm === "number"
+  ) {
+    return {
+      id: a.id,
+      type: a.sport === "run" ? "Run" : "Ride",
+      start_date_local: a.startDate,
+      distance: a.distanceKm * 1000,
+      total_elevation_gain: Number(a.elevationM ?? 0),
+      moving_time: Number(a.movingTimeSec ?? 0),
+      name: a.name,
+    };
+  }
+
+  return a;
+}
+
+function emptyGoals(year: number): YearGoals {
+  return { year, perSport: { run: {}, ride: {} } };
+}
 
 export default function App() {
-  const { token, status, setToken, setStatus } = useAuth();
+  const today = new Date();
 
-  const year = new Date().getFullYear();
+  const [sport, setSport] = useState<Sport>("run");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [goals, setGoals] = useState<YearGoals>(emptyGoals(year));
 
-  const { activities, loading, refreshing, error, source } = useActivities(year, !!token);
+  // optional: later expose in UI
+  const mode: ForecastMode = "ytd";
 
-  // Forecast mode (start with ytd like screenshot)
-  const [mode, setMode] = useState<ForecastMode>("ytd");
+  // activities (requires auth in your hook)
+  const { activities, loading, error } = useActivities(year, true);
 
-  const [dashboard, setDashboard] = useState<YearDashboard | null>(null);
-  const [dashError, setDashError] = useState<string | null>(null);
-
-  // temporary: log activities for debugging
-  // console.log("first activity", activities?.[0]);
-
-  // Recompute dashboard when activities/year/mode changes
+  // load goals whenever year changes OR drawer closes (after saving)
   useEffect(() => {
     let cancelled = false;
 
-    async function run() {
-      setDashError(null);
+    (async () => {
+      const loaded = await goalsRepo.loadGoals(year);
+      if (!cancelled) setGoals(loaded ?? emptyGoals(year));
+    })();
 
-      // If no activities yet, reset
-      if (!activities || activities.length === 0) {
-        setDashboard(null);
-        return;
-      }
-
-      try {
-        const d = await buildYearDashboardNow({
-          year,
-          activities,
-          mode,
-          // optional: if you later use blend:
-          // blendWeightRolling: 0.6,
-        });
-        if (!cancelled) setDashboard(d);
-      } catch (e) {
-        const errorMsg = e instanceof Error ? e.message : String(e);
-        if (!cancelled) setDashError(errorMsg);
-      }
-    }
-
-    void run();
     return () => {
       cancelled = true;
     };
-  }, [year, activities, mode]);
+  }, [year, settingsOpen]);
 
-  const run = dashboard?.run;
-  const ride = dashboard?.ride;
+  const dashboard = useMemo(() => {
+    if (!activities || activities.length === 0) return null;
+
+    const asOfLocalIso = new Date().toISOString();
+    const retrievedAtLocal = new Date().toString();
+
+    // normalize expects Strava-like; your activities are domain-like
+    const stravaLike = activities.map(toStravaLike);
+    const normalized = normalizeActivities(stravaLike as any);
+
+    function buildForSport(s: Sport): UiAthleteStats {
+      const agg = aggregateYear(normalized, year, s, asOfLocalIso);
+
+      const sportGoals = goals?.perSport?.[s];
+
+      return buildUiAthleteStats({
+        aggregate: agg,
+        asOfDateLocal: asOfLocalIso,
+        retrievedAtLocal,
+        goals: sportGoals,
+        mode,
+        blendWeightRolling: 0.6,
+      });
+    }
+
+    return {
+      run: buildForSport("run"),
+      ride: buildForSport("ride"),
+    };
+  }, [activities, goals, year, mode]);
+
+  const currentStats = dashboard ? (sport === "run" ? dashboard.run : dashboard.ride) : null;
 
   return (
-    <div style={{ padding: 24, fontFamily: "system-ui" }}>
-      <h1>Sports Tracking App</h1>
+    <>
+      <AppHeader
+        title="Sports-Tracking-App"
+        dateLabel={formatHeaderDate(today)}
+        dateTimeIso={today.toISOString().slice(0, 10)}
+        avatarText="HH"
+        onAvatarClick={() => setSettingsOpen(true)}
+      />
 
-      <p>
-        <strong>Status:</strong> {status}
-      </p>
+      <main className="container" role="main">
+        <SportSwitcher value={sport} onChange={setSport} showHiking={true} />
 
-      {!token && (
-        <button
-          onClick={() => startStravaLogin()}
-          style={{
-            padding: "12px 20px",
-            fontSize: "16px",
-            borderRadius: "8px",
-            border: "none",
-            backgroundColor: "#FC4C02",
-            color: "white",
-            cursor: "pointer",
-          }}
-        >
-          Login with Strava
-        </button>
-      )}
-
-      {token && (
-        <>
-          <LoggedInActions
-            onLoggedOut={() => {
-              setToken(null);
-              setStatus("Logged out");
-            }}
-          />
-
-          <hr style={{ margin: "24px 0" }} />
-
-          <h2>{year} Statistics</h2>
-
-          <p>
-            Activities source: <b>{source}</b>
-            {refreshing ? " (refreshing…)" : ""}
+        {loading && <p style={{ marginTop: 16 }}>Loading activities…</p>}
+        {error && (
+          <p style={{ marginTop: 16, color: "crimson" }}>
+            {error}
           </p>
+        )}
 
-          <div style={{ margin: "12px 0" }}>
-            <label style={{ marginRight: 8 }}>
-              Forecast mode:
-              <select
-                value={mode}
-                onChange={(e) => setMode(e.target.value as ForecastMode)}
-                style={{ marginLeft: 8, padding: "6px 8px" }}
-              >
-                <option value="ytd">ytd</option>
-                <option value="rolling28">rolling28</option>
-                <option value="blend">blend</option>
-              </select>
-            </label>
-          </div>
+        {!loading && !error && (
+          <section style={{ marginTop: 16, display: "grid", gap: 16 }}>
+            {currentStats ? (
+              <>
+                <YearlyDistanceGoalCard sport={sport} stats={currentStats} />
+                <YearlyCountGoalCard sport={sport} stats={currentStats} />
+                <YearlyElevationGoalCard sport={sport} stats={currentStats} />
+              </>
+            ) : (
+              <p>No activities yet for {year}.</p>
+            )}
+          </section>
+        )}
 
-          {loading && <p>Loading activities...</p>}
-          {error && <p style={{ color: "red" }}>{error}</p>}
-          {dashError && <p style={{ color: "red" }}>{dashError}</p>}
-
-          {!loading && !error && dashboard && (
-            <>
-              <h3>Running</h3>
-              <p>YTD distance (km): {run?.progress?.distanceKm?.ytd?.toFixed(1)}</p>
-              <p>YTD runs: {run?.progress?.count?.ytd}</p>
-              <p>Avg km/week: {run?.progress?.distanceKm?.avgPerWeek?.toFixed(1)}</p>
-              <p>Forecast distance (km): {run?.progress?.distanceKm?.forecast?.toFixed(1)}</p>
-              {typeof run?.progress?.distanceKm?.toVictory === "number" && (
-                <>
-                  <p>Goal (km): {run.progress.distanceKm.goal}</p>
-                  <p>Km to victory: {run.progress.distanceKm.toVictory?.toFixed(1)}</p>
-                  <p>Reachable: {String(run.progress.distanceKm.reachable)}</p>
-                  {run.progress.distanceKm.reachedInWeeks != null && (
-                    <p>
-                      Target reached in {run.progress.distanceKm.reachedInWeeks} weeks ({run.progress.distanceKm.reachedOnLocal})
-                    </p>
-                  )}
-                </>
-              )}
-
-              <h3 style={{ marginTop: 20 }}>Cycling</h3>
-              <p>YTD distance (km): {ride?.progress?.distanceKm?.ytd?.toFixed(1)}</p>
-              <p>YTD rides: {ride?.progress?.count?.ytd}</p>
-              <p>Avg km/week: {ride?.progress?.distanceKm?.avgPerWeek?.toFixed(1)}</p>
-              <p>Forecast distance (km): {ride?.progress?.distanceKm?.forecast?.toFixed(1)}</p>
-              {typeof ride?.progress?.distanceKm?.toVictory === "number" && (
-                <>
-                  <p>Goal (km): {ride.progress.distanceKm.goal}</p>
-                  <p>Km to victory: {ride.progress.distanceKm.toVictory?.toFixed(1)}</p>
-                  <p>Reachable: {String(ride.progress.distanceKm.reachable)}</p>
-                  {ride.progress.distanceKm.reachedInWeeks != null && (
-                    <p>
-                      Target reached in {ride.progress.distanceKm.reachedInWeeks} weeks ({ride.progress.distanceKm.reachedOnLocal})
-                    </p>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </>
-      )}
-
-      {/* DEV-only */}
-      <DebugPanel />
-    </div>
+        <BottomDrawer
+          open={settingsOpen}
+          title="Goals & Settings"
+          onClose={() => setSettingsOpen(false)}
+        >
+          <GoalsSettingsForm year={year} onYearChange={setYear} />
+        </BottomDrawer>
+      </main>
+    </>
   );
 }

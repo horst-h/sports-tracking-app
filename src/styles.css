@@ -1,0 +1,451 @@
+/* Merlin's Metrics — Home screen (pure HTML/CSS, spec-aligned) */
+
+:root {
+  /* Spec: off-white / very light gray background, pure white cards */
+  --bg: #F9F9F9;
+  --surface: #FFFFFF;
+  --text: #0b1220;
+  --text-muted: #6b7280;
+  --text-light: #9ca3af;
+  --border: rgba(0, 0, 0, 0.06);
+
+  /* Spec: soft corner radius, subtle shadow for elevation */
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.04);
+
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Spec: muted green for progress bars and positive status */
+  --accent-green: #22c55e;
+  --accent-green-muted: #16a34a;
+  --progress-track: #e5e7eb;
+  --progress-fill: var(--accent-green);
+
+  /* Status (traffic light): On Track / Under Plan / Over Plan */
+  --status-ontrack: #22c55e;
+  --status-ontrack-bg: #f0fdf4;
+  --status-under: #dc2626;
+  --status-under-bg: #fef2f2;
+  --status-over: #2563eb;
+  --status-over-bg: #eff6ff;
+
+  /* Pill active: dark background */
+  --pill-active-bg: #111827;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Single-column vertical scroll, mobile-first */
+.container {
+  width: min(100%, 640px);
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-4) var(--space-10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ----- Sticky Header ----- */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-header__inner {
+  width: min(100%, 640px);
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.app-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-brand__title {
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.app-brand__date {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.avatar:focus-visible {
+  outline: 2px solid var(--accent-green);
+  outline-offset: 2px;
+}
+
+.avatar__fallback {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* ----- Sport selection (pill-style segmented control) ----- */
+.sport-switcher {
+  width: 100%;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.segmented__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* Spec: inactive = neutral and unobtrusive */
+.segmented__option:hover {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* Spec: active = dark background with white text */
+.segmented__input:checked + .segmented__option {
+  background: var(--pill-active-bg);
+  color: #fff;
+  border-color: var(--pill-active-bg);
+}
+
+.segmented .icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* ----- Cards ----- */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.card--primary {
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.card__header {
+  padding: var(--space-5) var(--space-5) 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.card__header--solo {
+  padding-bottom: 0;
+}
+
+.card__kicker {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.card__body {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.card__body--tight {
+  padding: var(--space-5);
+}
+
+/* ----- Status badge (pill + colored dot) ----- */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.status-badge__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.status-badge__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-badge--ontrack {
+  color: var(--status-ontrack);
+  background: var(--status-ontrack-bg);
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.status-badge--ontrack .status-badge__dot {
+  background: var(--status-ontrack);
+}
+
+.status-badge--underplan {
+  color: var(--status-under);
+  background: var(--status-under-bg);
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.status-badge--underplan .status-badge__dot {
+  background: var(--status-under);
+}
+
+.status-badge--overplan {
+  color: var(--status-over);
+  background: var(--status-over-bg);
+  border-color: rgba(37, 99, 235, 0.2);
+}
+
+.status-badge--overplan .status-badge__dot {
+  background: var(--status-over);
+}
+
+/* ----- Goal context ----- */
+.goal-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-top: var(--space-3);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.goal-context__sport {
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text);
+}
+
+.goal-context__goal {
+  color: var(--text-light);
+}
+
+/* ----- Metrics (large bold numerals, labels medium gray) ----- */
+.metric {
+  margin-top: var(--space-4);
+}
+
+.metric__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.metric__value {
+  margin-top: var(--space-2);
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.metric--compact .metric__value {
+  font-size: 28px;
+}
+
+.metric__value--small {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ----- Progress bar: gray track, green fill ----- */
+.progress {
+  margin-top: var(--space-5);
+}
+
+.progress__bar {
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--progress-track);
+  overflow: hidden;
+}
+
+.progress__fill {
+  height: 100%;
+  width: var(--progress, 0%);
+  min-width: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--progress-fill);
+  transition: width 0.3s ease;
+}
+
+.progress__meta {
+  margin-top: var(--space-3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.progress__left {
+  flex: 1;
+}
+
+.progress__right {
+  color: var(--text);
+}
+
+.forecast {
+  margin: var(--space-5) 0 0;
+  font-size: 13px;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+/* ----- Insight cards (two-column grid) ----- */
+.insight-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+}
+
+.insight-line {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.insight-line strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.insight-sub {
+  margin-top: var(--space-3);
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* ----- Responsive ----- */
+@media (min-width: 480px) {
+  .metric__value {
+    font-size: 36px;
+  }
+
+  .metric--compact .metric__value {
+    font-size: 30px;
+  }
+}
+
+@media (min-width: 640px) {
+  .container {
+    padding-left: var(--space-6);
+    padding-right: var(--space-6);
+  }
+
+  .app-brand__title {
+    font-size: 18px;
+  }
+
+  .metric__value {
+    font-size: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmented__option,
+  .progress__fill {
+    transition: none;
+  }
+}
