@@ -125,7 +125,7 @@ export default function App() {
       />
 
       <main className="container" role="main">
-        <SportSwitcher value={sport} onChange={setSport} showHiking={true} />
+        <SportSwitcher value={sport} onChange={setSport} />
 
         {loading && <p style={{ marginTop: 16 }}>Loading activities…</p>}
         {error && (
