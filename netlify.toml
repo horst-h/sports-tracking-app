@@ -29,6 +29,44 @@
   port = 8888
 
 [[redirects]]
+  from = "/.netlify/functions/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# Vite special paths
+[[redirects]]
+  from = "/@vite/*"
+  to = "/@vite/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/@react-refresh"
+  to = "/@react-refresh"
+  status = 200
+
+[[redirects]]
+  from = "/@fs/*"
+  to = "/@fs/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/@id/*"
+  to = "/@id/:splat"
+  status = 200
+
+# Vite dependency paths (some setups still use this)
+[[redirects]]
+  from = "/node_modules/*"
+  to = "/node_modules/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/src/*"
+  to = "/src/:splat"
+  status = 200
+
+# SPA catch-all (LAST)
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

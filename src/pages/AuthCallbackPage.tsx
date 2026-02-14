@@ -1,26 +1,81 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { saveToken } from "../repositories/tokenRepository";
 
-function decodeTokenPayload(payload: string) {
+type TokenPayload = {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number; // epoch seconds
+};
+
+function decodeTokenPayload(payload: string): TokenPayload {
+  // oauth-callback packs: encodeURIComponent(btoa(JSON.stringify(...)))
   const json = atob(decodeURIComponent(payload));
-  return JSON.parse(json) as { access_token: string; refresh_token: string; expires_at: number };
+  const data = JSON.parse(json) as Partial<TokenPayload>;
+
+  if (
+    !data ||
+    typeof data.access_token !== "string" ||
+    typeof data.refresh_token !== "string" ||
+    typeof data.expires_at !== "number"
+  ) {
+    throw new Error("Invalid token payload");
+  }
+
+  return {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: data.expires_at,
+  };
+}
+
+function extractTokenFromHash(hash: string): string | null {
+  // Your redirect format is: /#token=...
+  // But your comment says: /#/auth/callback#token=...
+  // This handles both cases.
+  const idx = hash.indexOf("#token=");
+  if (idx === -1) return null;
+  return hash.substring(idx + "#token=".length) || null;
 }
 
 export default function AuthCallbackPage() {
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    // URL looks like: /#/auth/callback#token=....
-    const hash = window.location.hash; // "#/auth/callback#token=..."
-    const tokenPart = hash.split("#token=")[1];
-    if (!tokenPart) return;
+    (async () => {
+      try {
+        const tokenPart = extractTokenFromHash(window.location.hash);
+        if (!tokenPart) {
+          setError("Kein Token in der URL gefunden.");
+          return;
+        }
 
-    const data = decodeTokenPayload(tokenPart);
+        const data = decodeTokenPayload(tokenPart);
 
-    // TODO: store in IndexedDB tokenRepository (next step)
-    console.log("Received tokens:", data);
+        await saveToken({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          expires_at: data.expires_at,
+        });
 
-    // Clean URL
-    window.history.replaceState({}, "", "/#/");
-
+        // Clean URL (remove token fragment) and go home
+        window.history.replaceState({}, "", "/#/");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Unknown error");
+        // Still clean URL to avoid leaving tokens in history
+        window.history.replaceState({}, "", "/#/");
+      }
+    })();
   }, []);
+
+  if (error) {
+    return (
+      <div style={{ padding: 16 }}>
+        <h2>Login fehlgeschlagen</h2>
+        <p>{error}</p>
+        <p>Bitte versuche es erneut.</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 16 }}>
