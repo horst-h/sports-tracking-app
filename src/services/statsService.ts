@@ -82,36 +82,8 @@ export async function buildYearDashboard(params: {
   // 1) Load goals (optional)
   const goals = await loadGoals(year);
 
-  const runGoal = goals?.perSport?.run?.distanceKm;
-  const rideGoal = goals?.perSport?.ride?.distanceKm;
   const stravaLike = activities.map(toStravaLike);
   const normalized = normalizeActivities(stravaLike as any);
-  
-
-  // 2) Normalize activities once
-  function isStravaLike(a: any): boolean {
-  return (
-    a &&
-    typeof a === "object" &&
-    typeof a.type === "string" &&
-    typeof a.start_date_local === "string" &&
-    typeof a.distance === "number"
-  );
-}
-
-function isDomainLike(a: any): boolean {
-  return (
-    a &&
-    typeof a === "object" &&
-    (a.sport === "run" || a.sport === "ride") &&
-    (typeof a.startDateLocal === "string" ||
-      typeof a.start_date_local === "string" ||
-      typeof a.date === "string" ||
-      a.date instanceof Date) &&
-    (typeof a.distanceKm === "number" || typeof a.distance_km === "number")
-  );
-}
-
 
   // 3) Aggregate per sport
   const runAgg = aggregateYear(normalized, year, "run", asOfDateLocal);

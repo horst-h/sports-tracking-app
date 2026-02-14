@@ -3,6 +3,14 @@ import { openSportsDB } from "./db.ts";
 const STORE = "auth";
 const KEY = "stravaToken";
 
+export type TokenData = {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number; // epoch seconds
+  token_type?: string;
+  scope?: string;
+};
+
 export type StravaToken = {
   access_token: string;
   refresh_token: string;

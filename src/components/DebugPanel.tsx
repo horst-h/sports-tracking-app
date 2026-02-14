@@ -89,7 +89,7 @@ export default function DebugPanel() {
   async function runSmokeInBrowser() {
     setErr(null);
     try {
-      const m = await import("/src/domain/metrics/smoke.ts");
+      const m = await import("../domain/metrics/smoke.ts");
       const out = m.runSmoke?.();
       // eslint-disable-next-line no-console
       console.log("SMOKE OUTPUT:", out);

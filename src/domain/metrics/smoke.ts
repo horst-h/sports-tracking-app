@@ -46,7 +46,7 @@ export function runSmoke() {
     aggregate: runAgg,
     asOfDateLocal: asOf,
     retrievedAtLocal: retrievedAt,
-    goalDistanceKm: 1000,
+    goals: undefined,
     mode: "ytd",
   });
 
@@ -54,7 +54,7 @@ export function runSmoke() {
     aggregate: rideAgg,
     asOfDateLocal: asOf,
     retrievedAtLocal: retrievedAt,
-    goalDistanceKm: 2500,
+    goals: undefined,
     mode: "ytd",
   });
 
