@@ -1,9 +1,11 @@
 import type { UiAthleteStats } from "../domain/metrics/uiStats";
 import type { Sport } from "../domain/metrics/types";
+import type { ForecastResult } from "../domain/metrics/forecast";
 
 type Props = {
   sport: Sport;
   stats: UiAthleteStats;
+  forecast?: ForecastResult;
 };
 
 function sportLabel(s: Sport) {
@@ -24,7 +26,7 @@ function computeStatus(reachable: boolean | undefined) {
   return { label: "No Goal", className: "status-badge" };
 }
 
-export default function YearlyDistanceGoalCard({ sport, stats }: Props) {
+export default function YearlyDistanceGoalCard({ sport, stats, forecast }: Props) {
   const dist = stats.progress.distanceKm;
 
   const goal = dist.goal;
@@ -38,19 +40,42 @@ export default function YearlyDistanceGoalCard({ sport, stats }: Props) {
 
   return (
     <section className="card card--primary" aria-label="Yearly distance goal summary">
-      <header className="card__header">
-        <span className="card__kicker">Yearly Distance Goal</span>
-
-        <div className={status.className} aria-label={`Status: ${status.label}`}>
-          <svg className="status-badge__icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M9.2 16.2 5.7 12.7l1.4-1.4 2.1 2.1 7.7-7.7 1.4 1.4-9.1 9.1Z"
-              fill="currentColor"
-            />
-          </svg>
-          <span className="status-badge__dot" aria-hidden="true"></span>
-          <span>{status.label}</span>
+      <header className="card__header card__header--with-forecast">
+        <div className="card__header-top">
+          <span className="card__kicker">Yearly Distance Goal</span>
+          <div className={status.className} aria-label={`Status: ${status.label}`}>
+            <svg className="status-badge__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M9.2 16.2 5.7 12.7l1.4-1.4 2.1 2.1 7.7-7.7 1.4 1.4-9.1 9.1Z"
+                fill="currentColor"
+              />
+            </svg>
+            <span className="status-badge__dot" aria-hidden="true"></span>
+            <span>{status.label}</span>
+          </div>
         </div>
+
+        {forecast && (
+          <div className="card__forecast-header">
+            <div className="forecast-badge">{forecast.label}</div>
+            <div className="forecast-header-metrics">
+              <div className="forecast-metric-compact">
+                <span className="forecast-label">EoY Forecast</span>
+                <span className="forecast-value">{forecast.forecastEOY.toFixed(1)} km</span>
+              </div>
+              <div className="forecast-metric-compact">
+                <span className="forecast-label">Trend</span>
+                <span className="forecast-value">{forecast.trendPerWeek.toFixed(1)} km/week</span>
+              </div>
+              {forecast.perUnit && (
+                <div className="forecast-metric-compact">
+                  <span className="forecast-label">Avg per activity</span>
+                  <span className="forecast-value">{forecast.perUnit.toFixed(1)} km</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </header>
 
       <div className="card__body">
