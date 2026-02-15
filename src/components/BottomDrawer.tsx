@@ -27,60 +27,33 @@ export default function BottomDrawer({ open, title, onClose, children }: Props) 
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 10000,
-      }}
+      className="drawer-dialog"
     >
       {/* Backdrop */}
       <div
         onClick={onClose}
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "rgba(0,0,0,0.45)",
-        }}
+        className="drawer-backdrop"
       />
 
       {/* Sheet */}
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: "var(--surface, #fff)",
-          borderTopLeftRadius: 18,
-          borderTopRightRadius: 18,
-          padding: 16,
-          maxHeight: "85vh",
-          overflow: "auto",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+      <div className="drawer-sheet">
+        <div className="d-flex items-center justify-between gap-12">
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{title}</div>
-            <div style={{ opacity: 0.7, fontSize: 13 }}>Tap outside or press ESC to close</div>
+            <div className="font-bold text-md">{title}</div>
+            <div className="text-muted text-sm">Tap outside or press ESC to close</div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            style={{
-              border: "none",
-              background: "transparent",
-              fontSize: 22,
-              lineHeight: 1,
-              cursor: "pointer",
-            }}
+            className="drawer-close"
           >
             ×
           </button>
         </div>
 
-        <div style={{ marginTop: 14 }}>{children}</div>
+        <div className="mt-14">{children}</div>
       </div>
     </div>
   );

@@ -3,6 +3,8 @@ export type StravaAthlete = {
   username?: string;
   firstname?: string;
   lastname?: string;
+  profile_medium?: string; // URL to athlete profile image
+  profile?: string; // Larger profile image
 };
 
 export type StravaActivity = {

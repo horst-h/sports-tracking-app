@@ -3,6 +3,7 @@ type AppHeaderProps = {
   dateLabel: string;      // "Saturday, Feb 7, 2026"
   dateTimeIso: string;    // "2026-02-07"
   avatarText: string;     // "RV"
+  avatarImage?: string;   // URL to profile image (optional)
   onAvatarClick?: () => void;
 };
 
@@ -11,6 +12,7 @@ export default function AppHeader({
   dateLabel,
   dateTimeIso,
   avatarText,
+  avatarImage,
   onAvatarClick,
 }: AppHeaderProps) {
   return (
@@ -24,9 +26,17 @@ export default function AppHeader({
         </div>
 
         <button className="avatar" type="button" aria-label="Open profile" onClick={onAvatarClick}>
-          <span className="avatar__fallback" aria-hidden="true">
-            {avatarText}
-          </span>
+          {avatarImage ? (
+            <img
+              src={avatarImage}
+              alt="Profile"
+              className="avatar__image"
+            />
+          ) : (
+            <span className="avatar__fallback" aria-hidden="true">
+              {avatarText}
+            </span>
+          )}
         </button>
       </div>
     </header>

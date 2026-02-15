@@ -15,6 +15,7 @@ import { aggregateYear } from "./domain/metrics/aggregate";
 import { buildUiAthleteStats } from "./domain/metrics/uiStats";
 
 import { useActivities } from "./hooks/useActivities";
+import { useAthlete } from "./hooks/useAthlete";
 import * as goalsRepo from "./repositories/goalsRepository";
 
 function formatHeaderDate(d: Date) {
@@ -63,6 +64,9 @@ export default function App() {
 
   // optional: later expose in UI
   const mode: ForecastMode = "ytd";
+
+  // Athlete data (profile image)
+  const { athlete } = useAthlete(true);
 
   // activities (requires auth in your hook)
   const { activities, loading, error } = useActivities(year, true);
@@ -121,21 +125,22 @@ export default function App() {
         dateLabel={formatHeaderDate(today)}
         dateTimeIso={today.toISOString().slice(0, 10)}
         avatarText="HH"
+        avatarImage={athlete?.profile_medium}
         onAvatarClick={() => setSettingsOpen(true)}
       />
 
       <main className="container" role="main">
         <SportSwitcher value={sport} onChange={setSport} />
 
-        {loading && <p style={{ marginTop: 16 }}>Loading activities…</p>}
+        {loading && <p className="mt-16">Loading activities…</p>}
         {error && (
-          <p style={{ marginTop: 16, color: "crimson" }}>
+          <p className="mt-16 text-error">
             {error}
           </p>
         )}
 
         {!loading && !error && (
-          <section style={{ marginTop: 16, display: "grid", gap: 16 }}>
+          <section className="mt-16 d-grid gap-16">
             {currentStats ? (
               <>
                 <YearlyDistanceGoalCard sport={sport} stats={currentStats} />

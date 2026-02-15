@@ -6,7 +6,7 @@ type Props = {
 
 export default function LoggedInActions({ onLoggedOut }: Props) {
   return (
-    <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+    <div className="d-flex gap-12 mt-12 flex-wrap">
       <button
         onClick={async () => {
           await clearToken();
