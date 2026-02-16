@@ -28,9 +28,11 @@ export interface ForecastResult {
   delta: number;           // currentValue - expectedToday
   daysAhead: number;       // delta / daily ideal (can be negative)
   label: string;           // "X days ahead" or "X days behind"
+  badgeColor: "on-track" | "warning" | "danger";  // color based on deviation
   trendPerDay: number;     // avg daily progress (last 30 days or fallback)
   trendPerWeek: number;    // trendPerDay * 7 for weekly display
   forecastEOY: number;     // projected value at year end
+  requiredPerWeek: number; // pace needed per week to reach goal by year end
   perUnit?: number;        // last 30 days avg value per activity (optional)
   lines: {
     ideal: Point[];        // linear path to goal
@@ -212,14 +214,29 @@ export function calculateForecast(input: ForecastInput): ForecastResult {
     dailySeries,
   });
 
+  // Calculate required pace to reach goal by year end
+  const remaining = Math.max(goalValue - currentValue, 0);
+  const remainingDays = Math.max(daysLeft, 1);
+  const requiredPerDay = remaining / remainingDays;
+  const requiredPerWeek = round(requiredPerDay * 7, 2);
+
+  // Calculate badge color based on deviation percentage
+  let badgeColor: "on-track" | "warning" | "danger" = "on-track";
+  if (daysAhead < 0 && expectedToday > 0) {
+    const deviationPercent = (delta / expectedToday) * 100;
+    badgeColor = deviationPercent < -30 ? "danger" : "warning";
+  }
+
   return {
     expectedToday: round(expectedToday, 1),
     delta: round(delta, 1),
     daysAhead: round(daysAhead, 1),
     label,
+    badgeColor,
     trendPerDay: round(trendPerDay, 2),
     trendPerWeek,
     forecastEOY: round(forecastEOY, 1),
+    requiredPerWeek,
     perUnit,
     lines,
   };

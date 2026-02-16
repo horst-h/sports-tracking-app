@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+import { BarChart3 } from "lucide-react";
 import type { UiAthleteStats } from "../domain/metrics/uiStats";
 import type { Sport } from "../domain/metrics/types";
 import type { ForecastResult } from "../domain/metrics/forecast";
@@ -20,13 +22,22 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function computeStatus(reachable: boolean | undefined) {
+function computeStatus(reachable: boolean | undefined, forecast?: ForecastResult) {
   if (reachable === true) return { label: "On Track", className: "status-badge status-badge--ontrack" };
-  if (reachable === false) return { label: "Off Track", className: "status-badge status-badge--offtrack" };
+  if (reachable === false) {
+    const offTrackClasses = ["status-badge", "status-badge--offtrack"];
+    if (forecast && forecast.badgeColor === "warning") {
+      offTrackClasses.push("status-badge--warning");
+    } else if (forecast && forecast.badgeColor === "danger") {
+      offTrackClasses.push("status-badge--danger");
+    }
+    return { label: "Off Track", className: offTrackClasses.join(" ") };
+  }
   return { label: "No Goal", className: "status-badge" };
 }
 
 export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
+  const navigate = useNavigate();
   const m = stats.progress.count;
 
   const goal = m.goal;
@@ -36,7 +47,7 @@ export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
   const pctRounded = Math.round(pct);
 
   const remaining = m.toVictory ?? undefined;
-  const status = computeStatus(m.reachable);
+  const status = computeStatus(m.reachable, forecast);
 
   return (
     <section className="card card--primary" aria-label="Yearly units goal summary">
@@ -54,19 +65,63 @@ export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
             <span className="status-badge__dot" aria-hidden="true"></span>
             <span>{status.label}</span>
           </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/analyze/${sport}/count`);
+            }}
+            aria-label="Analyze units goal"
+            style={{
+              marginLeft: "auto",
+              padding: "6px",
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              color: "var(--text-muted)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "4px",
+              transition: "color 0.2s, background 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--bg-secondary)";
+              e.currentTarget.style.color = "var(--text)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = "var(--text-muted)";
+            }}
+          >
+            <BarChart3 size={18} />
+          </button>
         </div>
 
         {forecast && (
           <div className="card__forecast-header">
-            <div className="forecast-badge">{forecast.label}</div>
+            <div
+              className={`forecast-badge${
+                forecast.badgeColor === "warning"
+                  ? " forecast-badge--warning"
+                  : forecast.badgeColor === "danger"
+                    ? " forecast-badge--danger"
+                    : ""
+              }`}
+            >
+              {forecast.label}
+            </div>
             <div className="forecast-header-metrics">
               <div className="forecast-metric-compact">
                 <span className="forecast-label">EoY Forecast</span>
                 <span className="forecast-value">{Math.round(forecast.forecastEOY)} {unitLabel(sport)}</span>
               </div>
               <div className="forecast-metric-compact">
-                <span className="forecast-label">Trend</span>
-                <span className="forecast-value">{forecast.trendPerWeek.toFixed(1)} {unitLabel(sport)}/week</span>
+                <span className="forecast-label">
+                  {forecast.daysAhead < 0 ? "Required pace" : "Trend"}
+                </span>
+                <span className="forecast-value">
+                  {(forecast.daysAhead < 0 ? forecast.requiredPerWeek : forecast.trendPerWeek).toFixed(1)} {unitLabel(sport)}/week
+                </span>
               </div>
             </div>
           </div>
