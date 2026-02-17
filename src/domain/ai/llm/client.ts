@@ -2,6 +2,7 @@
 import type { AiResponse } from "../contracts/aiResponse";
 // import { buildInsightsPrompt } from "./prompt"; // TODO: implement when LLM integration is needed
 import type { AiContext } from "../contracts/aiContext";
+import type { AnalyzeFacts, AnalyzeNarrative } from "../contracts/analyzeNarrative";
 
 export async function fetchAiInsightsViaProxy(_args: {
   ctx: AiContext;
@@ -18,4 +19,18 @@ export async function fetchAiInsightsViaProxy(_args: {
 
   if (!res.ok) throw new Error(`AI proxy error ${res.status}`);
   return (await res.json()) as AiResponse;
+}
+
+// NEW: narrative for analyze screen
+export async function fetchAnalyzeNarrativeViaProxy(args: {
+  facts: AnalyzeFacts;
+}): Promise<AnalyzeNarrative> {
+  const res = await fetch("/.netlify/functions/analyzeNarrative", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ facts: args.facts }),
+  });
+
+  if (!res.ok) throw new Error(`Analyze narrative proxy error ${res.status}`);
+  return (await res.json()) as AnalyzeNarrative;
 }

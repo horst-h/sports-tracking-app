@@ -7,6 +7,7 @@ import YearlyCountGoalCard from "./components/YearlyCountGoalCard";
 import YearlyElevationGoalCard from "./components/YearlyElevationGoalCard";
 import BottomDrawer from "./components/BottomDrawer";
 import GoalsSettingsForm from "./components/GoalsSettingsForm";
+import LoginCard from "./components/LoginCard";
 
 import type { Sport, YearGoals, NormalizedActivity } from "./domain/metrics/types";
 import type { UiAthleteStats, ForecastMode } from "./domain/metrics/uiStats";
@@ -17,6 +18,7 @@ import { calculateForecast, type ForecastResult } from "./domain/metrics/forecas
 
 import { useActivities } from "./hooks/useActivities";
 import { useAthlete } from "./hooks/useAthlete";
+import { useAuth } from "./hooks/useAuth";
 import * as goalsRepo from "./repositories/goalsRepository";
 
 function formatHeaderDate(d: Date) {
@@ -122,13 +124,13 @@ export default function App() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [goals, setGoals] = useState<YearGoals>(emptyGoals(year));
 
-  // optional: later expose in UI
-  const mode: ForecastMode = "ytd";
+  // Auth check (MUST be before conditional return)
+  const { token } = useAuth();
 
-  // Athlete data (profile image)
+  // Athlete data (profile image) (MUST be before conditional return)
   const { athlete } = useAthlete(true);
 
-  // activities (requires auth in your hook)
+  // activities (MUST be before conditional return)
   const { activities, loading, error } = useActivities(year, true);
 
   // load goals whenever year changes OR drawer closes (after saving)
@@ -145,8 +147,12 @@ export default function App() {
     };
   }, [year, settingsOpen]);
 
+  // optional: later expose in UI
+  const mode: ForecastMode = "ytd";
+
+  // Build dashboard data (MUST be before conditional return)
   const dashboard = useMemo(() => {
-    if (!activities || activities.length === 0) return null;
+    if (!token || !activities || activities.length === 0) return null;
 
     const asOfLocalIso = new Date().toISOString();
     const retrievedAtLocal = new Date().toString();
@@ -212,7 +218,12 @@ export default function App() {
       run: buildForSport("run"),
       ride: buildForSport("ride"),
     };
-  }, [activities, goals, year, mode]);
+  }, [activities, goals, year, mode, token]);
+
+  // If not authenticated, show login card (AFTER all hooks)
+  if (!token) {
+    return <LoginCard />;
+  }
 
   const currentStats = dashboard
     ? (sport === "run" ? dashboard.run : dashboard.ride)
@@ -230,6 +241,29 @@ export default function App() {
       />
 
       <main className="container" role="main">
+        <button
+  onClick={async () => {
+    // best effort: alle bekannten Stores löschen
+    localStorage.clear();
+    sessionStorage.clear();
+    try {
+      if (indexedDB.databases) {
+        const dbs = await indexedDB.databases();
+        await Promise.all(dbs.map((db) => db.name ? new Promise<void>((resolve) => {
+          const req = indexedDB.deleteDatabase(db.name!);
+          req.onsuccess = () => resolve();
+          req.onerror = () => resolve();
+          req.onblocked = () => resolve();
+        }) : Promise.resolve()));
+      }
+    } catch {}
+    window.location.href = "/";
+  }}
+  style={{ padding: "0.5rem 0.75rem", borderRadius: "0.5rem" }}
+>
+  Force logout
+</button>
+
         <SportSwitcher value={sport} onChange={setSport} />
 
         {loading && <p className="mt-16">Loading activities…</p>}
