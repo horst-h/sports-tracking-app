@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import AppHeader from "./components/AppHeader";
 import SportSwitcher from "./components/SportSwitcher";
@@ -6,7 +7,6 @@ import YearlyDistanceGoalCard from "./components/YearlyDistanceGoalCard";
 import YearlyCountGoalCard from "./components/YearlyCountGoalCard";
 import YearlyElevationGoalCard from "./components/YearlyElevationGoalCard";
 import BottomDrawer from "./components/BottomDrawer";
-import GoalsSettingsForm from "./components/GoalsSettingsForm";
 import LoginCard from "./components/LoginCard";
 
 import type { Sport, YearGoals, NormalizedActivity } from "./domain/metrics/types";
@@ -121,17 +121,19 @@ export default function App() {
 
   const [sport, setSport] = useState<Sport>("run");
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const year = new Date().getFullYear();
   const [goals, setGoals] = useState<YearGoals>(emptyGoals(year));
 
   // Auth check (MUST be before conditional return)
   const { token } = useAuth();
 
+  const navigate = useNavigate();
+
   // Athlete data (profile image) (MUST be before conditional return)
-  const { athlete } = useAthlete(true);
+  const { athlete } = useAthlete(!!token);
 
   // activities (MUST be before conditional return)
-  const { activities, loading, error } = useActivities(year, true);
+  const { activities, loading, error } = useActivities(year, !!token);
 
   // load goals whenever year changes OR drawer closes (after saving)
   useEffect(() => {
@@ -229,6 +231,29 @@ export default function App() {
     ? (sport === "run" ? dashboard.run : dashboard.ride)
     : null;
 
+  async function handleForceLogout() {
+    localStorage.clear();
+    sessionStorage.clear();
+    try {
+      if (indexedDB.databases) {
+        const dbs = await indexedDB.databases();
+        await Promise.all(
+          dbs.map((db) =>
+            db.name
+              ? new Promise<void>((resolve) => {
+                  const req = indexedDB.deleteDatabase(db.name!);
+                  req.onsuccess = () => resolve();
+                  req.onerror = () => resolve();
+                  req.onblocked = () => resolve();
+                })
+              : Promise.resolve()
+          )
+        );
+      }
+    } catch {}
+    window.location.href = "/";
+  }
+
   return (
     <>
       <AppHeader
@@ -241,29 +266,6 @@ export default function App() {
       />
 
       <main className="container" role="main">
-        <button
-  onClick={async () => {
-    // best effort: alle bekannten Stores löschen
-    localStorage.clear();
-    sessionStorage.clear();
-    try {
-      if (indexedDB.databases) {
-        const dbs = await indexedDB.databases();
-        await Promise.all(dbs.map((db) => db.name ? new Promise<void>((resolve) => {
-          const req = indexedDB.deleteDatabase(db.name!);
-          req.onsuccess = () => resolve();
-          req.onerror = () => resolve();
-          req.onblocked = () => resolve();
-        }) : Promise.resolve()));
-      }
-    } catch {}
-    window.location.href = "/";
-  }}
-  style={{ padding: "0.5rem 0.75rem", borderRadius: "0.5rem" }}
->
-  Force logout
-</button>
-
         <SportSwitcher value={sport} onChange={setSport} />
 
         {loading && <p className="mt-16">Loading activities…</p>}
@@ -304,7 +306,35 @@ export default function App() {
           title="Goals & Settings"
           onClose={() => setSettingsOpen(false)}
         >
-          <GoalsSettingsForm year={year} onYearChange={setYear} />
+          <div style={{ display: "grid", gap: "0.75rem" }}>
+            <button
+              type="button"
+              onClick={() => {
+                setSettingsOpen(false);
+                navigate("/goals");
+              }}
+              aria-label="Manage goals"
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.5rem",
+                border: "1px solid var(--border)",
+                background: "var(--bg-secondary)",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              Manage goals
+            </button>
+
+            <div style={{ color: "var(--text-muted)", fontSize: "14px" }}>
+              More quick settings coming here.
+            </div>
+          </div>
+          <div className="drawer-footer">
+            <button type="button" onClick={handleForceLogout} className="drawer-logout">
+              Logout
+            </button>
+          </div>
         </BottomDrawer>
       </main>
     </>

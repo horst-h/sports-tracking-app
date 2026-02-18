@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Pencil } from "lucide-react";
 import type { UiAthleteStats } from "../domain/metrics/uiStats";
 import type { Sport } from "../domain/metrics/types";
 import type { ForecastResult } from "../domain/metrics/forecast";
@@ -38,6 +38,7 @@ export default function YearlyElevationGoalCard({ sport, stats, forecast }: Prop
 
   const goal = m.goal;
   const completed = m.ytd;
+  const hasGoal = typeof goal === "number";
 
   const pct = typeof goal === "number" && goal > 0 ? clamp((completed / goal) * 100, 0, 999) : 0;
   const pctRounded = Math.round(pct);
@@ -61,36 +62,66 @@ export default function YearlyElevationGoalCard({ sport, stats, forecast }: Prop
             <span className="status-badge__dot" aria-hidden="true"></span>
             <span>{status.label}</span>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/analyze/${sport}/elevation`);
-            }}
-            aria-label="Analyze elevation goal"
-            style={{
-              marginLeft: "auto",
-              padding: "6px",
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-              color: "var(--text-muted)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "4px",
-              transition: "color 0.2s, background 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--bg-secondary)";
-              e.currentTarget.style.color = "var(--text)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = "var(--text-muted)";
-            }}
-          >
-            <BarChart3 size={18} />
-          </button>
+          <div style={{ marginLeft: "auto", display: "flex", gap: "6px" }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/analyze/${sport}/elevation`);
+              }}
+              aria-label="Analyze elevation goal"
+              style={{
+                padding: "6px",
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                color: "var(--text-muted)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                transition: "color 0.2s, background 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-secondary)";
+                e.currentTarget.style.color = "var(--text)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--text-muted)";
+              }}
+            >
+              <BarChart3 size={18} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/goals/${sport}/elevation`);
+              }}
+              aria-label="Edit elevation goal"
+              style={{
+                padding: "6px",
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                color: "var(--text-muted)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                transition: "color 0.2s, background 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-secondary)";
+                e.currentTarget.style.color = "var(--text)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--text-muted)";
+              }}
+            >
+              <Pencil size={18} />
+            </button>
+          </div>
         </div>
 
         {forecast && (
@@ -138,6 +169,28 @@ export default function YearlyElevationGoalCard({ sport, stats, forecast }: Prop
           </span>
         </div>
 
+        {!hasGoal && (
+          <div style={{ marginBottom: "1rem", color: "var(--text-muted)" }}>
+            <div>No goal set - set a goal to see forecast and on/off-track status.</div>
+            <button
+              type="button"
+              onClick={() => navigate(`/goals/${sport}/elevation`)}
+              aria-label="Set elevation goal"
+              style={{
+                marginTop: "0.5rem",
+                border: "none",
+                background: "transparent",
+                color: "var(--text)",
+                cursor: "pointer",
+                padding: 0,
+                textDecoration: "underline",
+              }}
+            >
+              Set goal
+            </button>
+          </div>
+        )}
+
         <div className="metric">
           <div className="metric__label">Elevation Completed</div>
           <div className="metric__value">{completed} m</div>
@@ -165,10 +218,12 @@ export default function YearlyElevationGoalCard({ sport, stats, forecast }: Prop
           </div>
         </div>
 
-        <p className="forecast">
-          Based on current training rhythm goal reached:{" "}
-          <strong>{m.reachedOnLocal ?? "—"}</strong>
-        </p>
+        {hasGoal && (
+          <p className="forecast">
+            Based on current training rhythm goal reached:{" "}
+            <strong>{m.reachedOnLocal ?? "—"}</strong>
+          </p>
+        )}
       </div>
     </section>
   );

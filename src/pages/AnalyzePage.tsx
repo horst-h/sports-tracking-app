@@ -59,6 +59,14 @@ export default function AnalyzePage() {
   const isValidSport = sport && VALID_SPORTS.includes(sport);
   const isValidMetric = metric && VALID_METRICS.includes(metric);
 
+  // Load data
+  const year = new Date().getFullYear();
+  const { token } = useAuth();
+  const enabled = !!token && !!isValidSport && !!isValidMetric;
+  const { activities, loading: activitiesLoading } = useActivities(year, enabled);
+  useAthlete(enabled); // Ensure athlete is loaded but not directly used
+  const { goals } = useGoals(year);
+
   if (!isValidSport || !isValidMetric) {
     return (
       <div className="container-page">
@@ -86,16 +94,9 @@ export default function AnalyzePage() {
     );
   }
 
-  // Load data
-  const year = new Date().getFullYear();
-  const { activities, loading: activitiesLoading } = useActivities(year, true);
-  useAthlete(true); // Ensure athlete is loaded but not directly used
-  const { token } = useAuth();
-  const { goals } = useGoals(year);
-
   // Build UI stats with same logic as App.tsx
   const uiStats = useMemo(() => {
-    if (!activities || activities.length === 0 || !goals) return null;
+    if (!token || !activities || activities.length === 0 || !goals) return null;
 
     const asOfLocalIso = new Date().toISOString();
     const retrievedAtLocal = new Date().toString();
@@ -147,6 +148,13 @@ export default function AnalyzePage() {
   const { data: aiNarrative, loading: aiLoading, error: aiError, debug: aiDebug } =
     useAnalyzeNarrative(llmFacts, aiEnabled);
 
+  const aiFootnote = useMemo(() => {
+    if (!aiNarrative || !aiDebug?.timestamp) return null;
+    const modelLabel = aiDebug.model ? `Model ${aiDebug.model}` : "Model unknown";
+    const when = new Date(aiDebug.timestamp).toLocaleString();
+    return `AI-generated · ${when} · ${modelLabel}`;
+  }, [aiNarrative, aiDebug]);
+
 
   // Build narrative
   const narrative = useMemo(() => {
@@ -169,18 +177,7 @@ export default function AnalyzePage() {
       <div className="container-page">
         <button
           onClick={() => navigate(-1)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1rem',
-            marginBottom: '1rem',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            color: 'var(--text-muted)',
-            fontSize: '14px',
-          }}
+          className="nav-back"
           aria-label="Go back"
         >
           <ArrowLeft size={18} />
@@ -218,18 +215,7 @@ export default function AnalyzePage() {
       {/* Back button */}
       <button
         onClick={() => navigate(-1)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          padding: '0.75rem 1rem',
-          marginBottom: '1rem',
-          border: 'none',
-          background: 'transparent',
-          cursor: 'pointer',
-          color: 'var(--text-muted)',
-          fontSize: '14px',
-        }}
+        className="nav-back"
         aria-label="Go back"
       >
         <ArrowLeft size={18} />
@@ -247,57 +233,73 @@ export default function AnalyzePage() {
       {/* Narrative (AI preferred, fallback to rule-based) */}
       <div className="card card--primary" style={{ marginBottom: '2rem' }}>
         <div className="card__body">
-          {aiEnabled && aiNarrative ? (
-            <>
-              <h2
-                style={{
-                  marginBottom: '0.75rem',
-                  fontSize: '18px',
-                  fontWeight: '700',
-                }}
-              >
-                {aiNarrative.headline}
-              </h2>
-
-              <p style={{ lineHeight: '1.6', color: 'var(--text)' }}>
-                {aiNarrative.paragraph}
-              </p>
-
-              <ul
-                style={{
-                  marginTop: '1rem',
-                  paddingLeft: '1.25rem',
-                  lineHeight: '1.6',
-                }}
-              >
-                <li>{aiNarrative.bullets[0]}</li>
-                <li>{aiNarrative.bullets[1]}</li>
-              </ul>
-
-              {aiLoading && (
-                <p
+          {aiEnabled ? (
+            aiNarrative ? (
+              <>
+                <h2
                   style={{
-                    marginTop: '0.75rem',
-                    color: 'var(--text-muted)',
-                    fontSize: '13px',
+                    marginBottom: '0.75rem',
+                    fontSize: '18px',
+                    fontWeight: '700',
                   }}
                 >
-                  Analysiere…
-                </p>
-              )}
+                  {aiNarrative.headline}
+                </h2>
 
-              {aiError && (
-                <p
+                <p style={{ lineHeight: '1.6', color: 'var(--text)' }}>
+                  {aiNarrative.paragraph}
+                </p>
+
+                <ul
                   style={{
-                    marginTop: '0.75rem',
-                    color: 'var(--text-muted)',
-                    fontSize: '13px',
+                    marginTop: '1rem',
+                    paddingLeft: '1.25rem',
+                    lineHeight: '1.6',
                   }}
                 >
-                  AI gerade nicht verfügbar – zeige Standard-Analyse.
-                </p>
-              )}
-            </>
+                  <li>{aiNarrative.bullets[0]}</li>
+                  <li>{aiNarrative.bullets[1]}</li>
+                </ul>
+
+                {aiFootnote && <div className="ai-footnote">{aiFootnote}</div>}
+              </>
+            ) : aiLoading ? (
+              <div className="ai-loading" aria-live="polite" aria-busy="true">
+                <div className="ai-loading__dots" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div className="ai-loading__label">Analysiere…</div>
+              </div>
+            ) : (
+              <>
+                {aiError && (
+                  <p
+                    style={{
+                      marginBottom: '0.75rem',
+                      color: 'var(--text-muted)',
+                      fontSize: '13px',
+                    }}
+                  >
+                    AI gerade nicht verfuegbar – zeige Standard-Analyse.
+                  </p>
+                )}
+                {narrative.paragraphs.map((p, i) => (
+                  <p
+                    key={i}
+                    style={{
+                      marginBottom:
+                        i < narrative.paragraphs.length - 1 ? '1rem' : 0,
+                      lineHeight: '1.6',
+                      color: 'var(--text)',
+                    }}
+                  >
+                    {p}
+                  </p>
+                ))}
+              </>
+            )
           ) : (
             <>
               {narrative.paragraphs.map((p, i) => (

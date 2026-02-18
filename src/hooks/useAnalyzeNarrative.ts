@@ -9,6 +9,12 @@ type DebugInfo = {
   timestamp: string;
 };
 
+type DebugMeta = {
+  model?: string;
+  durationMs?: number;
+  timestamp: string;
+};
+
 export type AnalyzeNarrativeResult = {
   data: AnalyzeNarrative | null;
   loading: boolean;
@@ -28,6 +34,7 @@ export function useAnalyzeNarrative(facts: AnalyzeFacts | null, enabled: boolean
   const [debug, setDebug] = useState<DebugInfo | null>(null);
 
   const key = useMemo(() => (facts ? cacheKey(facts) : null), [facts]);
+  const metaKey = useMemo(() => (key ? `${key}:meta` : null), [key]);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,15 +47,20 @@ export function useAnalyzeNarrative(facts: AnalyzeFacts | null, enabled: boolean
       if (cached) {
         try {
           const cachedData = JSON.parse(cached);
+          const cachedMetaRaw = metaKey ? localStorage.getItem(metaKey) : null;
+          const cachedMeta = cachedMetaRaw ? (JSON.parse(cachedMetaRaw) as DebugMeta) : null;
           setData(cachedData);
           setDebug({
             source: "cache",
-            timestamp: new Date().toISOString(),
+            model: cachedMeta?.model,
+            durationMs: cachedMeta?.durationMs,
+            timestamp: cachedMeta?.timestamp ?? new Date().toISOString(),
           });
           console.log("[DEBUG] Narrative from CACHE");
           return;
         } catch {
           localStorage.removeItem(key);
+          if (metaKey) localStorage.removeItem(metaKey);
         }
       }
 
@@ -72,6 +84,14 @@ export function useAnalyzeNarrative(facts: AnalyzeFacts | null, enabled: boolean
         // Store in cache (without _debug field)
         const { _debug, ...cleanData } = r as any;
         localStorage.setItem(key, JSON.stringify(cleanData));
+        if (metaKey) {
+          const meta: DebugMeta = {
+            model: (r as any)?._debug?.model,
+            durationMs: (r as any)?._debug?.durationMs,
+            timestamp: new Date().toISOString(),
+          };
+          localStorage.setItem(metaKey, JSON.stringify(meta));
+        }
       } catch (e: any) {
         console.log("[DEBUG] Narrative ERROR", e?.message ?? e);
         if (!cancelled) {

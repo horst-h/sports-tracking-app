@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   open: boolean;
@@ -8,6 +8,38 @@ type Props = {
 };
 
 export default function BottomDrawer({ open, title, onClose, children }: Props) {
+  const [visible, setVisible] = useState(open);
+  const [closing, setClosing] = useState(false);
+  const closeTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+      setVisible(true);
+      setClosing(false);
+      return;
+    }
+
+    if (!open && visible) {
+      setClosing(true);
+      closeTimerRef.current = window.setTimeout(() => {
+        setVisible(false);
+        setClosing(false);
+        closeTimerRef.current = null;
+      }, 260);
+    }
+
+    return () => {
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+    };
+  }, [open, visible]);
+
   // ESC schließen
   useEffect(() => {
     if (!open) return;
@@ -20,14 +52,14 @@ export default function BottomDrawer({ open, title, onClose, children }: Props) 
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!visible) return null;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="drawer-dialog"
+      className={`drawer-dialog${closing ? " drawer-dialog--closing" : ""}`}
     >
       {/* Backdrop */}
       <div
