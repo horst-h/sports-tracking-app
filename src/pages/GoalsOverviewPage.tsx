@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import SportSwitcher from "../components/SportSwitcher";
 import { useGoals } from "../hooks/useGoals";
@@ -13,9 +13,17 @@ const METRICS: Array<{ key: GoalMetric; route: "distance" | "count" | "elevation
 
 export default function GoalsOverviewPage() {
   const navigate = useNavigate();
-  const [sport, setSport] = useState<Sport>("run");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sportParam = searchParams.get("sport");
+  const initialSport: Sport = sportParam === "ride" ? "ride" : "run";
+  const [sport, setSport] = useState<Sport>(initialSport);
   const year = new Date().getFullYear();
   const { goals, loading } = useGoals(year);
+
+  // Update URL when sport changes
+  useEffect(() => {
+    setSearchParams({ sport }, { replace: true });
+  }, [sport, setSearchParams]);
 
   const currentGoals = goals?.perSport?.[sport] ?? {};
 

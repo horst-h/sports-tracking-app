@@ -139,8 +139,8 @@ export default function GoalEditPage() {
   }
 
   function handleBack() {
-    if (window.history.length > 1) navigate(-1);
-    else navigate("/goals");
+    // Navigate back to goals overview with the current sport preserved
+    navigate(`/goals?sport=${sport}`);
   }
 
   const sportLabel = sport === "run" ? "Running" : "Cycling";

@@ -11,6 +11,7 @@
     "smoke": "tsx src/domain/metrics/smoke.ts"
   },
   "dependencies": {
+    "@netlify/blobs": "^10.7.0",
     "idb": "^8.0.3",
     "lucide-react": "^0.564.0",
     "react": "^19.2.0",
