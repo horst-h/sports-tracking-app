@@ -87,12 +87,17 @@ export class NetlifyBlobsGoalsStore implements GoalsStore {
  * Factory: creates the appropriate store based on environment.
  */
 export function createGoalsStore(): GoalsStore {
-  // Try Netlify Blobs first (production)
+  const isNetlify = process.env.NETLIFY === "true";
+
+  if (!isNetlify) {
+    console.info("[GoalsStore] Using in-memory store (local development)");
+    return new InMemoryGoalsStore();
+  }
+
   try {
     return new NetlifyBlobsGoalsStore();
-  } catch {
-    // Fallback to in-memory (dev)
-    console.warn("[GoalsStore] Using in-memory fallback (data will not persist)");
+  } catch (error) {
+    console.warn("[GoalsStore] Netlify Blobs unavailable, using in-memory fallback:", error);
     return new InMemoryGoalsStore();
   }
 }

@@ -294,7 +294,7 @@ export default function App() {
               type="button"
               onClick={() => {
                 setSettingsOpen(false);
-                navigate(`/goals?sport=${sport}`);
+                navigate(`/goals/${sport}`);
               }}
               aria-label="Manage goals"
               style={{

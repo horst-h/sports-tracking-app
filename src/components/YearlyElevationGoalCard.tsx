@@ -116,7 +116,7 @@ export default function YearlyElevationGoalCard({ sport, stats, forecast }: Prop
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigate(`/goals/${sport}/elevation`);
+                  navigate(`/goals/${sport}`);
                 }}
                 aria-label="Edit elevation goal"
                 style={{
@@ -181,7 +181,7 @@ export default function YearlyElevationGoalCard({ sport, stats, forecast }: Prop
             <div>No goal set - set a goal to see forecast and on/off-track status.</div>
             <button
               type="button"
-              onClick={() => navigate(`/goals/${sport}/elevation`)}
+              onClick={() => navigate(`/goals/${sport}`)}
               aria-label="Set elevation goal"
               style={{
                 marginTop: "0.5rem",
