@@ -922,7 +922,7 @@ body {
 /* Responsive: on larger screens, badge and metrics side by side */
 @media (min-width: 480px) {
   .card__forecast-header {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 1fr auto;
     gap: 14px;
     align-items: flex-start;
   }
@@ -930,6 +930,7 @@ body {
   .forecast-badge {
     padding: 8px 12px;
     font-size: 12px;
+    justify-self: end;
   }
 
   .forecast-header-metrics {
