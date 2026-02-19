@@ -20,6 +20,7 @@ import { useActivities } from "./hooks/useActivities";
 import { useAthlete } from "./hooks/useAthlete";
 import { useAuth } from "./hooks/useAuth";
 import * as goalsRepo from "./repositories/goalsRepository";
+import { clearToken } from "./repositories/tokenRepository";
 
 function formatHeaderDate(d: Date) {
   return d.toDateString();
@@ -232,32 +233,14 @@ export default function App() {
     : null;
 
   async function handleForceLogout() {
-    localStorage.clear();
-    sessionStorage.clear();
-    try {
-      if (indexedDB.databases) {
-        const dbs = await indexedDB.databases();
-        await Promise.all(
-          dbs.map((db) =>
-            db.name
-              ? new Promise<void>((resolve) => {
-                  const req = indexedDB.deleteDatabase(db.name!);
-                  req.onsuccess = () => resolve();
-                  req.onerror = () => resolve();
-                  req.onblocked = () => resolve();
-                })
-              : Promise.resolve()
-          )
-        );
-      }
-    } catch {}
+    await clearToken();
     window.location.href = "/";
   }
 
   return (
     <>
       <AppHeader
-        title="Sports-Tracking-App"
+        title="still moving"
         dateLabel={formatHeaderDate(today)}
         dateTimeIso={today.toISOString().slice(0, 10)}
         avatarText="HH"
@@ -332,7 +315,7 @@ export default function App() {
           </div>
           <div className="drawer-footer">
             <button type="button" onClick={handleForceLogout} className="drawer-logout">
-              Logout
+              Sign out
             </button>
           </div>
         </BottomDrawer>

@@ -28,7 +28,7 @@
   /* Spec: muted green for progress bars and positive status */
   --accent-green: #22c55e;
   --accent-green-muted: #16a34a;
-  --progress-track: #e5e7eb;
+  --progress-track: #e2e8f0;
   --progress-fill: var(--accent-green);
 
   /* Status (traffic light): On Track / Under Plan / Over Plan */
@@ -107,16 +107,56 @@ body {
   margin: 0 auto;
   padding: var(--space-4) var(--space-4);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-5);
+}
+
+.app-logo-placeholder {
+  flex-shrink: 0;
+  width: 60px;
+  height: 44px;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
 .app-brand {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
 }
+
+.app-brand__title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-brand__dots {
+  display: flex;
+  gap: 4px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dot--1 {
+  background: #ef4444;
+}
+
+.dot--2 {
+  background: #f59e0b;
+}
+
+.dot--3 {
+  background: #10b981;
+}
+
 
 .app-brand__title {
   font-weight: 700;
@@ -314,29 +354,39 @@ body {
 }
 
 .status-badge--ontrack {
-  color: var(--status-ontrack);
-  background: var(--status-ontrack-bg);
-  border-color: rgba(34, 197, 94, 0.2);
+  color: #15803d;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: transparent;
 }
 
 .status-badge--ontrack .status-badge__dot {
-  background: var(--status-ontrack);
+  background: #15803d;
+}
+
+.status-badge--catchup {
+  color: #92400e;
+  background: rgba(234, 179, 8, 0.12);
+  border-color: transparent;
+}
+
+.status-badge--catchup .status-badge__dot {
+  background: #92400e;
 }
 
 .status-badge--offtrack {
-  color: var(--status-under);
-  background: var(--status-under-bg);
-  border-color: rgba(220, 38, 38, 0.2);
+  color: #7f1d1d;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: transparent;
 }
 
 .status-badge--offtrack .status-badge__dot {
-  background: var(--status-under);
+  background: #7f1d1d;
 }
 
 .status-badge--offtrack.status-badge--warning {
   color: #92400e;
   background: rgba(234, 179, 8, 0.12);
-  border-color: rgba(234, 179, 8, 0.2);
+  border-color: transparent;
 }
 
 .status-badge--offtrack.status-badge--warning .status-badge__dot {
@@ -346,7 +396,7 @@ body {
 .status-badge--offtrack.status-badge--danger {
   color: #7f1d1d;
   background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.2);
+  border-color: transparent;
 }
 
 .status-badge--offtrack.status-badge--danger .status-badge__dot {
@@ -442,7 +492,6 @@ body {
   width: var(--progress, 0%);
   min-width: 4px;
   border-radius: var(--radius-pill);
-  background: var(--progress-fill);
   transition: width 0.3s ease;
 }
 
@@ -459,6 +508,7 @@ body {
 
 .progress__left {
   flex: 1;
+  color: var(--text);
 }
 
 .progress__right {
@@ -639,6 +689,27 @@ body {
 .gap-14 { gap: 14px; }
 .gap-16 { gap: 16px; }
 
+/* Tailwind-style color utilities used by status pills and progress fill */
+.bg-emerald-100 { background-color: #d1fae5; }
+.bg-emerald-500 { background-color: #10b981; }
+.text-emerald-700 { color: #047857; }
+.border-emerald-300 { border-color: #6ee7b7; }
+
+.bg-amber-100 { background-color: #fef3c7; }
+.bg-amber-500 { background-color: #f59e0b; }
+.text-amber-700 { color: #b45309; }
+.border-amber-300 { border-color: #fcd34d; }
+
+.bg-rose-100 { background-color: #ffe4e6; }
+.bg-rose-500 { background-color: #f43f5e; }
+.text-rose-700 { color: #be123c; }
+.border-rose-300 { border-color: #fda4af; }
+
+.bg-slate-100 { background-color: #f1f5f9; }
+.bg-slate-400 { background-color: #94a3b8; }
+.text-slate-500 { color: #64748b; }
+.border-slate-200 { border-color: #e2e8f0; }
+
 /* Grid */
 .grid { display: grid; }
 .gap-12 { gap: 12px; }
@@ -760,19 +831,8 @@ body {
   font-weight: 600;
   padding: 6px 10px;
   border-radius: 8px;
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+  border: 1px solid transparent;
   width: fit-content;
-}
-
-.forecast-badge--warning {
-  background: rgba(234, 179, 8, 0.12);
-  color: #92400e;
-}
-
-.forecast-badge--danger {
-  background: rgba(239, 68, 68, 0.12);
-  color: #7f1d1d;
 }
 
 .forecast-metrics {
