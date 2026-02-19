@@ -155,7 +155,7 @@ export default function App() {
 
   // Build dashboard data (MUST be before conditional return)
   const dashboard = useMemo(() => {
-    if (!token || !activities || activities.length === 0) return null;
+    if (!token || !activities) return null;
 
     const asOfLocalIso = new Date().toISOString();
     const retrievedAtLocal = new Date().toString();
