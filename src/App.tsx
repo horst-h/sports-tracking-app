@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import AppHeader from "./components/AppHeader";
 import SportSwitcher from "./components/SportSwitcher";
@@ -129,9 +129,24 @@ export default function App() {
   const { token } = useAuth();
 
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Athlete data (profile image) (MUST be before conditional return)
   const { athlete } = useAthlete(!!token);
+
+  // Restore sport from URL on mount
+  useEffect(() => {
+    const param = searchParams.get("sport");
+    if (param === "run" || param === "ride") {
+      setSport(param);
+    }
+  }, [searchParams]);
+
+  // Wrapper to update both state and URL when user clicks sport switcher
+  function handleSportChange(newSport: Sport) {
+    setSport(newSport);
+    setSearchParams({ sport: newSport }, { replace: true });
+  }
 
   // activities (MUST be before conditional return)
   const { activities, loading, error } = useActivities(year, !!token);
@@ -249,7 +264,7 @@ export default function App() {
       />
 
       <main className="container" role="main">
-        <SportSwitcher value={sport} onChange={setSport} />
+        <SportSwitcher value={sport} onChange={handleSportChange} />
 
         {loading && <p className="mt-16">Loading activities…</p>}
         {error && (
@@ -294,7 +309,7 @@ export default function App() {
               type="button"
               onClick={() => {
                 setSettingsOpen(false);
-                navigate(`/goals/${sport}`);
+                navigate(`/goals/${sport}`, { state: { sport } });
               }}
               aria-label="Manage goals"
               style={{

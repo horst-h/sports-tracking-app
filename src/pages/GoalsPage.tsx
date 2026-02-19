@@ -126,7 +126,7 @@ export default function GoalsPage() {
     if (pendingSaveRef.current) {
       await pendingSaveRef.current;
     }
-    navigate("/");
+    navigate(`/?sport=${sportKey}`);
   }
 
   return (
