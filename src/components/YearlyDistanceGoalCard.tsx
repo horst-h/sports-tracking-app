@@ -3,9 +3,9 @@ import { BarChart3, Pencil } from "lucide-react";
 import type { UiAthleteStats } from "../domain/metrics/uiStats";
 import type { Sport } from "../domain/metrics/types";
 import type { ForecastResult } from "../domain/metrics/forecast";
+import GoalStatusHeader from "./GoalStatusHeader";
 import {
   calculateGoalStatus,
-  getForecastBadgeStyles,
   getStatusStyles,
   type GoalStatus,
 } from "../domain/metrics/goalStatus";
@@ -69,20 +69,12 @@ export default function YearlyDistanceGoalCard({ sport, stats, forecast }: Props
               {typeof goal === "number" ? `${goal} km` : "—"}
             </div>
           </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              flexWrap: "nowrap",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
+
+          <GoalStatusHeader
+            statusLabel={status.label}
+            status={status.status}
+            daysAhead={forecast?.daysAhead}
           >
-            <div className={`status-badge ${statusStyles.pillClass}`} aria-label={`Status: ${status.label}`}>
-              <span className="status-badge__dot" aria-hidden="true"></span>
-              <span>{status.label}</span>
-            </div>
             <div style={{ display: "flex", gap: "6px", flexWrap: "nowrap" }}>
               <button
                 onClick={(e) => {
@@ -143,7 +135,7 @@ export default function YearlyDistanceGoalCard({ sport, stats, forecast }: Props
                 <Pencil size={18} />
               </button>
             </div>
-          </div>
+          </GoalStatusHeader>
         </div>
 
         {forecast && (
@@ -167,9 +159,6 @@ export default function YearlyDistanceGoalCard({ sport, stats, forecast }: Props
                   <span className="forecast-value">{forecast.perUnit.toFixed(1)} km</span>
                 </div>
               )}
-            </div>
-            <div className={`forecast-badge ${getForecastBadgeStyles(forecast.badgeColor)}`}>
-              {forecast.label}
             </div>
           </div>
         )}

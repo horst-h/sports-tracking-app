@@ -3,9 +3,9 @@ import { BarChart3, Pencil } from "lucide-react";
 import type { UiAthleteStats } from "../domain/metrics/uiStats";
 import type { Sport } from "../domain/metrics/types";
 import type { ForecastResult } from "../domain/metrics/forecast";
+import GoalStatusHeader from "./GoalStatusHeader";
 import {
   calculateGoalStatus,
-  getForecastBadgeStyles,
   getStatusStyles,
   type GoalStatus,
 } from "../domain/metrics/goalStatus";
@@ -73,20 +73,12 @@ export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
               {typeof goal === "number" ? `${goal} ${unitLabel(sport)}` : "—"}
             </div>
           </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              flexWrap: "nowrap",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
+
+          <GoalStatusHeader
+            statusLabel={status.label}
+            status={status.status}
+            daysAhead={forecast?.daysAhead}
           >
-            <div className={`status-badge ${statusStyles.pillClass}`} aria-label={`Status: ${status.label}`}>
-              <span className="status-badge__dot" aria-hidden="true"></span>
-              <span>{status.label}</span>
-            </div>
             <div style={{ display: "flex", gap: "6px", flexWrap: "nowrap" }}>
               <button
                 onClick={(e) => {
@@ -147,7 +139,7 @@ export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
                 <Pencil size={18} />
               </button>
             </div>
-          </div>
+          </GoalStatusHeader>
         </div>
 
         {forecast && (
@@ -155,7 +147,7 @@ export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
             <div className="forecast-header-metrics">
               <div className="forecast-metric-compact">
                 <span className="forecast-label">EoY Forecast</span>
-                <span className="forecast-value">{Math.round(forecast.forecastEOY)} {unitLabel(sport)}</span>
+            GoalStatusHeader <span className="forecast-value">{Math.round(forecast.forecastEOY)} {unitLabel(sport)}</span>
               </div>
               <div className="forecast-metric-compact">
                 <span className="forecast-label">
@@ -165,9 +157,6 @@ export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
                   {(forecast.daysAhead < 0 ? forecast.requiredPerWeek : forecast.trendPerWeek).toFixed(1)} {unitLabel(sport)}/week
                 </span>
               </div>
-            </div>
-            <div className={`forecast-badge ${getForecastBadgeStyles(forecast.badgeColor)}`}>
-              {forecast.label}
             </div>
           </div>
         )}

@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import type { Sport } from "../domain/metrics/types";
+import RunningIcon from "./icons/RunningIcon";
+import CyclingIcon from "./icons/CyclingIcon";
+import HikingIcon from "./icons/HikingIcon";
 
 type Props = {
   value: Sport;
@@ -32,12 +35,7 @@ export default function SportSwitcher({ value, onChange }: Props) {
           onChange={() => onChange("run")}
         />
         <label className="segmented__option" htmlFor="sport-running">
-          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M13.5 5.2a2.2 2.2 0 1 0 0 4.4 2.2 2.2 0 0 0 0-4.4Zm-3.3 6 2.2-1.1 2.3 1.3 1.5 2.2h2.4v2h-3.4l-1.3-2-1.5-.8-1.6 2.6 1.8 1.7 2.5.7-.5 2-3.2-.9-2.6-2.4-2 3.2H5v-2h1.4l3.8-6.3Z"
-              fill="currentColor"
-            />
-          </svg>
+          <RunningIcon />
           <span>Running</span>
         </label>
 
@@ -51,12 +49,7 @@ export default function SportSwitcher({ value, onChange }: Props) {
           onChange={() => onChange("ride")}
         />
         <label className="segmented__option" htmlFor="sport-cycling">
-          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M16.5 5.3a2.1 2.1 0 1 0 0 4.2 2.1 2.1 0 0 0 0-4.2ZM8.2 11h3.3l1.7 2.6h-2L10 12.1H8.9l2 3H14a4.5 4.5 0 1 1-.7 2H10a4.5 4.5 0 1 1-1.8-6.1ZM6.5 17.1a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm13 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
-              fill="currentColor"
-            />
-          </svg>
+          <CyclingIcon />
           <span>Cycling</span>
         </label>
 
@@ -78,12 +71,7 @@ export default function SportSwitcher({ value, onChange }: Props) {
             comingSoon();
           }}
         >
-          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M9.5 4.7a2.2 2.2 0 1 0 0 4.4 2.2 2.2 0 0 0 0-4.4Zm4.1 5.9 1.9 1.2 1 3.5h2.5v2h-4l-1.1-3.8-1-.6-1.1 2.5 1.5 1.5.6 3.4-2 .3-.6-3.1-2-2L7 20H4.8v-2h1l3.8-6.6 2-1.2Z"
-              fill="currentColor"
-            />
-          </svg>
+          <HikingIcon />
           <span>Hiking</span>
         </label>
       </div>
