@@ -12,6 +12,20 @@ export type AnalyzeFacts = {
 
   weeksLeft: number;
   avgPerActivity?: number;
+
+  // Time context
+  todayISO?: string;
+  dayOfYear?: number;
+  totalDaysInYear?: number;
+  expectedProgressPercent?: number;
+
+  // Cross-sport context
+  otherSport?: {
+    sport: "run" | "ride";
+    progressPercent: number;
+    status: "on_track" | "close" | "off_track";
+    trendPerWeek?: number;
+  };
 };
 
 export type AnalyzeNarrative = {

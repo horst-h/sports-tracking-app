@@ -19,6 +19,29 @@ import CyclingIcon from '../components/icons/CyclingIcon';
 const VALID_SPORTS: Sport[] = ['run', 'ride'];
 const VALID_METRICS = ['distance', 'count', 'elevation'];
 
+// Time context helpers
+function getDayOfYear(date: Date): number {
+  const start = new Date(date.getFullYear(), 0, 0);
+  const diff = date.getTime() - start.getTime();
+  const oneDay = 1000 * 60 * 60 * 24;
+  return Math.floor(diff / oneDay);
+}
+
+function getTotalDaysInYear(year: number): number {
+  return ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) ? 366 : 365;
+}
+
+function computeExpectedProgressPercent(dayOfYear: number, totalDaysInYear: number): number {
+  return Math.round((dayOfYear / totalDaysInYear) * 100);
+}
+
+function calculateGoalStatus(requiredPerWeek: number, trendPerWeek: number): "on_track" | "close" | "off_track" {
+  const ratio = requiredPerWeek > 0 ? trendPerWeek / requiredPerWeek : 1;
+  if (ratio >= 1.15) return "on_track";
+  if (ratio >= 0.95) return "close";
+  return "off_track";
+}
+
 // Helper: Convert domain activity to Strava-like (same as App.tsx)
 function toStravaLike(a: any) {
   if (!a || typeof a !== 'object') return a;
@@ -126,9 +149,66 @@ export default function AnalyzePage() {
     return deriveMetricFacts(sport, metric, uiStats, goals.perSport);
   }, [uiStats, goals, sport, metric]);
 
+  // Compute cross-sport stats for context (hoisted to avoid nested useMemo)
+  const otherSportStats = useMemo(() => {
+    const otherSport = sport === 'run' ? 'ride' : 'run';
+    const otherSportGoals = goals?.perSport[otherSport];
+    
+    if (!activities || !otherSportGoals) return null;
+    
+    const stravaLike = activities.map(toStravaLike);
+    const normalized = normalizeActivities(stravaLike as any);
+    const agg = aggregateYear(normalized, year, otherSport, new Date().toISOString());
+    
+    return buildUiAthleteStats({
+      aggregate: agg,
+      asOfDateLocal: new Date().toISOString(),
+      retrievedAtLocal: new Date().toString(),
+      goals: otherSportGoals,
+      mode: 'ytd',
+    });
+  }, [activities, goals, year, sport]);
+
   // Map domain facts -> LLM facts
   const llmFacts: LlmAnalyzeFacts | null = useMemo(() => {
     if (!facts) return null;
+
+    // Compute time context
+    const today = new Date();
+    const todayISO = today.toISOString().split('T')[0];
+    const dayOfYear = getDayOfYear(today);
+    const totalDaysInYear = getTotalDaysInYear(today.getFullYear());
+    const expectedProgressPercent = computeExpectedProgressPercent(dayOfYear, totalDaysInYear);
+
+    // Compute cross-sport context
+    const otherSport = sport === 'run' ? 'ride' : 'run';
+    const otherSportGoals = goals?.perSport[otherSport];
+
+    let otherSportContext: LlmAnalyzeFacts['otherSport'] | undefined;
+    if (otherSportStats && otherSportGoals) {
+      // Find the same metric for the other sport
+      const otherMetricKey = metric === 'distance' ? 'distanceKm' : metric === 'count' ? 'count' : 'elevationM';
+      const otherGoalValue = otherSportGoals[otherMetricKey];
+      const otherProgress = otherSportStats.progress[otherMetricKey];
+      
+      if (otherGoalValue && otherProgress) {
+        const otherProgressPercent = Math.round((otherProgress.ytd / otherGoalValue) * 100);
+        const otherRequiredPerWeek = otherSportStats.weeksLeftExact > 0 
+          ? Math.max(0, otherGoalValue - otherProgress.ytd) / otherSportStats.weeksLeftExact 
+          : 0;
+        const otherStatus = calculateGoalStatus(
+          otherRequiredPerWeek, 
+          otherProgress.avgPerWeek
+        );
+        
+        otherSportContext = {
+          sport: otherSport,
+          progressPercent: otherProgressPercent,
+          status: otherStatus,
+          trendPerWeek: Math.round(otherProgress.avgPerWeek * 100) / 100,
+        };
+      }
+    }
 
     return {
       sport,
@@ -140,10 +220,16 @@ export default function AnalyzePage() {
       trendPerWeek: facts.trendPerWeek,
       forecastEoy: facts.forecastEoy,
       weeksLeft: facts.weeksLeft,
-      // deriveMetricFacts nennt es avgPerUnit; im LLM-Contract avgPerActivity
       avgPerActivity: facts.avgPerUnit,
+      // Time context
+      todayISO,
+      dayOfYear,
+      totalDaysInYear,
+      expectedProgressPercent,
+      // Cross-sport context
+      otherSport: otherSportContext,
     };
-  }, [facts, sport, metric]);
+  }, [facts, sport, metric, goals, otherSportStats]);
 
 
   const aiEnabled = true; // später als Setting/Toggle

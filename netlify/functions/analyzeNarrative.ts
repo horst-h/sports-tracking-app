@@ -11,6 +11,18 @@ type AnalyzeFacts = {
   forecastEoy: number;
   weeksLeft: number;
   avgPerActivity?: number;
+  // Time context
+  todayISO?: string;
+  dayOfYear?: number;
+  totalDaysInYear?: number;
+  expectedProgressPercent?: number;
+  // Cross-sport context
+  otherSport?: {
+    sport: "run" | "ride";
+    progressPercent: number;
+    status: "on_track" | "close" | "off_track";
+    trendPerWeek?: number;
+  };
 };
 
 type AnalyzeNarrative = {
@@ -19,6 +31,23 @@ type AnalyzeNarrative = {
   bullets: [string, string];
   toneTag?: "on_track" | "close" | "off_track";
 };
+
+// Time context helpers
+function getDayOfYear(dateISO: string): number {
+  const date = new Date(dateISO);
+  const start = new Date(date.getFullYear(), 0, 0);
+  const diff = date.getTime() - start.getTime();
+  const oneDay = 1000 * 60 * 60 * 24;
+  return Math.floor(diff / oneDay);
+}
+
+function getTotalDaysInYear(year: number): number {
+  return ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) ? 366 : 365;
+}
+
+function computeExpectedProgressPercent(dayOfYear: number, totalDaysInYear: number): number {
+  return Math.round((dayOfYear / totalDaysInYear) * 100);
+}
 
 function isValidFacts(x: any): x is AnalyzeFacts {
   if (!x) return false;
@@ -32,8 +61,18 @@ function isValidFacts(x: any): x is AnalyzeFacts {
 
 function unit(metric: AnalyzeFacts["metric"]) {
   if (metric === "distance") return "km";
-  if (metric === "elevation") return "hm";
-  return "Einheiten";
+  if (metric === "elevation") return "m";
+  return "activities";
+}
+
+function sportLabel(sport: "run" | "ride") {
+  return sport === "run" ? "Running" : "Cycling";
+}
+
+function metricLabel(metric: AnalyzeFacts["metric"]) {
+  if (metric === "distance") return "Distance";
+  if (metric === "count") return "Activity Count";
+  return "Elevation";
 }
 
 function toneTag(f: AnalyzeFacts): AnalyzeNarrative["toneTag"] {
@@ -60,40 +99,88 @@ export const handler: Handler = async (event) => {
 
     console.log("[DEBUG] LLM FUNCTION INVOKED", facts);
 
+    // Compute time context if not provided
+    const todayISO = facts.todayISO || new Date().toISOString().split('T')[0];
+    const year = new Date(todayISO).getFullYear();
+    const dayOfYear = facts.dayOfYear || getDayOfYear(todayISO);
+    const totalDaysInYear = facts.totalDaysInYear || getTotalDaysInYear(year);
+    const expectedProgressPercent = facts.expectedProgressPercent || computeExpectedProgressPercent(dayOfYear, totalDaysInYear);
+    
+    const actualProgressPercent = facts.goal > 0 ? Math.round((facts.already / facts.goal) * 100) : 0;
+
     const extra = {
       unit: unit(facts.metric),
+      sportLabel: sportLabel(facts.sport),
+      metricLabel: metricLabel(facts.metric),
       toneTag: toneTag(facts),
       bufferToGoal: facts.forecastEoy - facts.goal,
+      actualProgressPercent,
+      expectedProgressPercent,
+      dayOfYear,
+      totalDaysInYear,
+      todayISO,
     };
 
     const system = [
-      "Du bist ein sportlicher Coach-Writer für eine Ausdauer-App.",
-      "Englisch, du-Form, leicht coachig, klar, nicht zu lang.",
-      "Nutze ausschließlich die Zahlen aus dem Input (facts).",
-      "Keine neuen Berechnungen, keine neuen Zahlen, keine medizinischen Aussagen.",
-      "WICHTIG: Füge am Ende des Headline ' (AI)' an, damit klar ist dass dies vom Modell generiert ist.",
-      "Gib ausschließlich JSON zurück."
+      "You are a sports coaching writer for an endurance training app.",
+      "Write in English, second person (you), coaching tone, clear and concise.",
+      "Use ONLY the numbers from the input (facts). Never calculate new numbers or make medical claims.",
+      "IMPORTANT: Append ' (AI)' to the headline to indicate it's AI-generated.",
+      "Return ONLY valid JSON."
     ].join(" ");
 
     const user = [
-      "Erstelle eine Analyse als Prosa für einen Screen.",
-      "Format: 1 Absatz (max ~70–90 Wörter), danach GENAU 2 Bulletpoints.",
-      "Beziehe dich auf Trend/Woche vs nötig/Woche; nenne Forecast vs Ziel und weeksLeft.",
-      "Wenn avgPerActivity vorhanden ist, baue es natürlich ein.",
-      "Nutze die Einheit extra.unit.",
+      "Create a focused analysis for the SELECTED sport and goal category.",
       "",
-      "facts:",
-      JSON.stringify(facts),
+      "STRUCTURE YOUR RESPONSE WITH THESE SECTIONS:",
+      "1. headline: Brief status for selected sport+category (append ' (AI)')",
+      "2. paragraph: One focused paragraph (70-90 words) covering:",
+      "   - Progress vs time-of-year expectation",
+      "   - Current trend vs required weekly pace",
+      "   - Forecast vs goal",
+      "   - What to do this week for THIS sport/category",
+      "3. bullets: EXACTLY 2 actionable tips, specific to selected sport/category",
+      "4. toneTag: 'on_track' | 'close' | 'off_track'",
       "",
-      "extra (nicht rechnen, nur nutzen):",
-      JSON.stringify(extra),
+      "CROSS-SPORT GUIDANCE (keep brief, mention only if relevant):",
+      "- If otherSport data is provided and it's off-track while selected is on-track,",
+      "  briefly suggest shifting some weekly capacity.",
+      "- If both are off-track, warn about overload risk.",
+      "- Keep cross-sport mentions to 1 sentence max in the paragraph.",
       "",
-      "Antwort-JSON:",
-      `{"headline": "... (AI)", "paragraph": "...", "bullets": ["...","..."], "toneTag":"on_track|close|off_track"}`
-    ].join("\n");
+      "TIME CONTEXT:",
+      `- Today is ${extra.todayISO}, day ${extra.dayOfYear} of ${extra.totalDaysInYear}`,
+      `- Expected progress at this point: ${extra.expectedProgressPercent}%`,
+      `- Actual progress: ${extra.actualProgressPercent}%`,
+      "",
+      "SELECTED SPORT & CATEGORY:",
+      `- Sport: ${extra.sportLabel}`,
+      `- Category: ${extra.metricLabel}`,
+      `- Goal: ${facts.goal} ${extra.unit}`,
+      `- Already: ${facts.already} ${extra.unit} (${extra.actualProgressPercent}%)`,
+      `- Remaining: ${facts.remaining} ${extra.unit}`,
+      `- Required per week: ${facts.requiredPerWeek} ${extra.unit}`,
+      `- Current trend: ${facts.trendPerWeek} ${extra.unit}/week`,
+      `- Forecast for Dec 31: ${facts.forecastEoy} ${extra.unit}`,
+      `- Weeks left: ${facts.weeksLeft}`,
+      facts.avgPerActivity ? `- Avg per activity: ${facts.avgPerActivity} ${extra.unit}` : "",
+      "",
+      facts.otherSport ? [
+        "OTHER SPORT (context only, keep brief):",
+        `- Sport: ${sportLabel(facts.otherSport.sport)}`,
+        `- Progress: ${facts.otherSport.progressPercent}%`,
+        `- Status: ${facts.otherSport.status}`,
+        facts.otherSport.trendPerWeek ? `- Trend: ${facts.otherSport.trendPerWeek}/week` : "",
+      ].join("\n") : "OTHER SPORT: none provided",
+      "",
+      "OUTPUT JSON FORMAT:",
+      `{"headline": "... (AI)", "paragraph": "...", "bullets": ["...","..."], "toneTag": "on_track|close|off_track"}`
+    ].filter(Boolean).join("\n");
 
     const model = "gpt-4o-mini";
     console.log("[DEBUG] Calling OpenAI model:", model);
+    console.log("[DEBUG] Time context:", { todayISO, dayOfYear, totalDaysInYear, expectedProgressPercent, actualProgressPercent });
+    console.log("[DEBUG] Cross-sport context:", facts.otherSport ? `${facts.otherSport.sport} at ${facts.otherSport.progressPercent}%` : "none");
     const startTime = Date.now();
 
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
