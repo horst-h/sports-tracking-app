@@ -147,7 +147,7 @@ export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
             <div className="forecast-header-metrics">
               <div className="forecast-metric-compact">
                 <span className="forecast-label">EoY Forecast</span>
-            GoalStatusHeader <span className="forecast-value">{Math.round(forecast.forecastEOY)} {unitLabel(sport)}</span>
+                <span className="forecast-value">{Math.round(forecast.forecastEOY)} {unitLabel(sport)}</span>
               </div>
               <div className="forecast-metric-compact">
                 <span className="forecast-label">

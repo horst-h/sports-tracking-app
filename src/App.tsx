@@ -254,18 +254,32 @@ export default function App() {
 
   return (
     <>
-      <AppHeader
-        title="still moving"
-        dateLabel={formatHeaderDate(today)}
-        dateTimeIso={today.toISOString().slice(0, 10)}
-        avatarText="HH"
-        avatarImage={athlete?.profile_medium}
-        onAvatarClick={() => setSettingsOpen(true)}
-      />
-
-      <main className="container" role="main">
+      {/* Sticky Header + Tab Navigation Container */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          backgroundColor: "var(--bg)",
+          borderBottom: "1px solid var(--border)",
+          width: "min(100%, 640px)",
+          margin: "0 auto",
+          paddingLeft: "var(--space-4)",
+          paddingRight: "var(--space-4)",
+        }}
+      >
+        <AppHeader
+          title="still moving"
+          dateLabel={formatHeaderDate(today)}
+          dateTimeIso={today.toISOString().slice(0, 10)}
+          avatarText="HH"
+          avatarImage={athlete?.profile_medium}
+          onAvatarClick={() => setSettingsOpen(true)}
+        />
         <SportSwitcher value={sport} onChange={handleSportChange} />
+      </div>
 
+      <main className="container" role="main" style={{ paddingTop: "0.5rem" }}>
         {loading && <p className="mt-16">Loading activities…</p>}
         {error && (
           <p className="mt-16 text-error">

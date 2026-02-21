@@ -20,7 +20,7 @@ export type NarrativeResult = {
 function getMetricLabel(metric: string, plural = false): string {
   const labels: Record<string, [string, string]> = {
     distance: ["km", "km"],
-    count: ["Aktivität", "Aktivitäten"],
+    count: ["Activity", "Activities"],
     elevation: ["m", "m"],
   };
   const [sing, plur] = labels[metric] || ["", ""];
@@ -28,7 +28,7 @@ function getMetricLabel(metric: string, plural = false): string {
 }
 
 function getSportLabel(sport: Sport): string {
-  return sport === "run" ? "Laufen" : "Radfahren";
+  return sport === "run" ? "Running" : "Cycling";
 }
 
 function formatNumber(n: number, metric: string): string {
@@ -58,57 +58,57 @@ export function buildNarrative(
   } = facts;
 
   const bullets: Array<{ label: string; value: string }> = [
-    { label: "Bereits erreicht", value: `${formatNumber(ytd, metric)} ${metricLabel}` },
-    { label: "Ziel", value: `${formatNumber(goal, metric)} ${metricLabel}` },
-    { label: "Verbleibend", value: `${formatNumber(remaining, metric)} ${metricLabel}` },
-    { label: "Nötig pro Woche", value: `${formatNumber(requiredPerWeek, metric)} ${metricLabel}` },
-    { label: "Aktueller Trend", value: `${formatNumber(trendPerWeek, metric)} ${metricLabel}/Woche` },
+    { label: "Already achieved", value: `${formatNumber(ytd, metric)} ${metricLabel}` },
+    { label: "Goal", value: `${formatNumber(goal, metric)} ${metricLabel}` },
+    { label: "Remaining", value: `${formatNumber(remaining, metric)} ${metricLabel}` },
+    { label: "Required per week", value: `${formatNumber(requiredPerWeek, metric)} ${metricLabel}` },
+    { label: "Current trend", value: `${formatNumber(trendPerWeek, metric)} ${metricLabel}/week` },
     {
-      label: "Prognose zum 31.12.",
+      label: "Forecast for Dec 31",
       value: `${formatNumber(forecastEoy, metric)} ${metricLabel}`,
     },
   ];
 
   if (avgPerUnit !== undefined && metric === "distance") {
-    bullets.push({ label: "Durchschnitt pro Aktivität", value: `${formatNumber(avgPerUnit, metric)} km` });
+    bullets.push({ label: "Average per activity", value: `${formatNumber(avgPerUnit, metric)} km` });
   }
 
   // Paragraph 1: Status
   let p1 = "";
   if (remaining <= 0) {
-    p1 = `Glückwunsch! Du hast dein Ziel von ${formatNumber(goal, metric)} ${metricLabel} bereits erreicht. `;
-    p1 += `Dein momentaner Trend deutet darauf hin, dass du am ${getSportLabel(sport)} noch viel Spaß hast. `;
-    p1 += `Wie geht's dem Körper? 😄`;
+    p1 = `Congratulations! You've already hit your goal of ${formatNumber(goal, metric)} ${metricLabel}. `;
+    p1 += `Your current trend suggests you're still having fun with ${getSportLabel(sport).toLowerCase()}. `;
+    p1 += `How's the body holding up? 😄`;
   } else if (requiredPerWeek <= trendPerWeek * 1.1) {
-    // Kleine Toleranz: wenn required nur 10% unter trend
-    p1 = `Du bist auf Kurs! 🎯 `;
-    p1 += `Mit deinem aktuellen Rhythmus von Ø ${formatNumber(trendPerWeek, metric)} ${metricLabel}/Woche `;
-    p1 += `erreichst du dein Ziel bis zum Ende des Jahres. `;
-    p1 += `Bleib dabei, die Form ist gut.`;
+    // Small tolerance: if required is only 10% below trend
+    p1 = `You're on track! 🎯 `;
+    p1 += `At your current pace of ø ${formatNumber(trendPerWeek, metric)} ${metricLabel}/week, `;
+    p1 += `you'll hit your goal by year-end. `;
+    p1 += `Keep it up – you're in good form.`;
   } else {
-    p1 = `Du liegst hinter deinem Plan. 📉 `;
-    p1 += `Um dein Ziel von ${formatNumber(goal, metric)} ${metricLabel} zu erreichen, `;
-    p1 += `brauchst du Ø ${formatNumber(requiredPerWeek, metric)} ${metricLabel}/Woche. `;
-    p1 += `Aktuell liegst du bei Ø ${formatNumber(trendPerWeek, metric)} ${metricLabel}/Woche.`;
+    p1 = `You're falling behind your plan. 📉 `;
+    p1 += `To reach your goal of ${formatNumber(goal, metric)} ${metricLabel}, `;
+    p1 += `you need ø ${formatNumber(requiredPerWeek, metric)} ${metricLabel}/week. `;
+    p1 += `Right now you're at ø ${formatNumber(trendPerWeek, metric)} ${metricLabel}/week.`;
   }
 
   // Paragraph 2: Forecast & action
   let p2 = "";
   if (remaining <= 0) {
-    p2 = `Mit deinem aktuellen Trend würdest du bis Jahresende insgesamt ${formatNumber(forecastEoy, metric)} ${metricLabel} erreichen. `;
-    p2 += `Das ist deutlich über dem Ziel – toller Einsatz!`;
+    p2 = `At your current pace, you'd reach ${formatNumber(forecastEoy, metric)} ${metricLabel} by year-end. `;
+    p2 += `That's well above your goal – great effort!`;
   } else {
-    const weeksLeftStr = weeksLeft < 1 ? "weniger als eine Woche" : `${Math.ceil(weeksLeft)} Wochen`;
-    p2 = `Es sind noch ${weeksLeftStr} im Jahr. `;
+    const weeksLeftStr = weeksLeft < 1 ? "less than a week" : `${Math.ceil(weeksLeft)} weeks`;
+    p2 = `You have ${weeksLeftStr} left in the year. `;
     if (trendPerWeek > 0 && Math.abs(forecastEoy - goal) <= Math.max(goal * 0.15, 10)) {
-      // Recht nah dran
-      p2 += `Wenn es so weitergeht, bist du sehr nah an deinem Ziel.`;
+      // Pretty close
+      p2 += `If you keep this pace, you'll be very close to your goal.`;
     } else if (forecastEoy < goal) {
       const shortfall = formatNumber(goal - forecastEoy, metric);
-      p2 += `Aktuell besteht die Gefahr, dass du ${shortfall} ${metricLabel} zu kurz kommst. `;
-      p2 += `Erhöhe dein Tempo, wenn möglich.`;
+      p2 += `There's a risk you could fall ${shortfall} ${metricLabel} short. `;
+      p2 += `Pick up the pace if you can.`;
     } else {
-      p2 += `Deine Prognose: ${formatNumber(forecastEoy, metric)} ${metricLabel} – knapp über dem Ziel.`;
+      p2 += `Your forecast: ${formatNumber(forecastEoy, metric)} ${metricLabel} – just above the goal.`;
     }
   }
 

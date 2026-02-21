@@ -52,7 +52,7 @@ export default function GoalStatusHeader({ statusLabel, status, daysAhead, child
     <div
       style={{
         display: "flex",
-        alignItems: "flex-start",
+        alignItems: "center",
         gap: "12px",
         flexWrap: "nowrap",
         whiteSpace: "nowrap",
@@ -60,14 +60,14 @@ export default function GoalStatusHeader({ statusLabel, status, daysAhead, child
       }}
     >
       {/* Status Pill + Delta (vertical stack) */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "2px", alignItems: "center" }}>
         <div
           className={`status-badge ${statusStyles.pillClass}`}
           aria-label={`Status: ${statusLabel}`}
           style={{
             fontSize: "0.875rem",
             fontWeight: 600,
-            padding: "4px 10px",
+            padding: "4px 18px",
             borderRadius: "12px",
             border: "1px solid currentColor",
             opacity: 0.9,
@@ -75,6 +75,7 @@ export default function GoalStatusHeader({ statusLabel, status, daysAhead, child
             alignItems: "center",
             justifyContent: "center",
             textAlign: "center",
+            minWidth: "130px",
           }}
         >
           <span>{statusLabel}</span>
@@ -84,7 +85,7 @@ export default function GoalStatusHeader({ statusLabel, status, daysAhead, child
         {showDelta && (
           <div
             style={{
-              fontSize: "0.75rem",
+              fontSize: "0.8rem",
               fontWeight: 500,
               display: "flex",
               alignItems: "center",

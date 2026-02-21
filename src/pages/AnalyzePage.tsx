@@ -13,6 +13,8 @@ import type { Sport } from '../domain/metrics/types';
 import { useGoals } from '../hooks/useGoals';
 import { useAnalyzeNarrative } from '../hooks/useAnalyzeNarrative';
 import type { AnalyzeFacts as LlmAnalyzeFacts } from '../domain/ai/contracts/analyzeNarrative';
+import RunningIcon from '../components/icons/RunningIcon';
+import CyclingIcon from '../components/icons/CyclingIcon';
 
 const VALID_SPORTS: Sport[] = ['run', 'ride'];
 const VALID_METRICS = ['distance', 'count', 'elevation'];
@@ -224,8 +226,18 @@ export default function AnalyzePage() {
 
       {/* Title */}
       <h1
-        style={{ marginBottom: '1.5rem', fontSize: '28px', fontWeight: '700' }}
+        style={{ 
+          marginBottom: '1.5rem', 
+          fontSize: '28px', 
+          fontWeight: '700',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}
       >
+        <span style={{ display: 'flex', alignItems: 'center', width: '28px', height: '28px' }}>
+          {sport === 'run' ? <RunningIcon /> : <CyclingIcon />}
+        </span>
         {narrative.title}
       </h1>
 
@@ -270,7 +282,7 @@ export default function AnalyzePage() {
                   <span></span>
                   <span></span>
                 </div>
-                <div className="ai-loading__label">Analysiere…</div>
+                <div className="ai-loading__label">Analyzing…</div>
               </div>
             ) : (
               <>
@@ -282,7 +294,7 @@ export default function AnalyzePage() {
                       fontSize: '13px',
                     }}
                   >
-                    AI gerade nicht verfuegbar – zeige Standard-Analyse.
+                    AI not available right now – showing standard analysis.
                   </p>
                 )}
                 {narrative.paragraphs.map((p, i) => (
@@ -362,7 +374,7 @@ export default function AnalyzePage() {
         </div>
       </div>
 
-      {/* DEBUG PANEL (nur im Dev-Mode) */}
+      {/* DEBUG PANEL (dev mode only) */}
       {import.meta.env.DEV && aiDebug && (
         <div
           style={{
@@ -381,7 +393,7 @@ export default function AnalyzePage() {
           </h3>
 
           <div style={{ marginBottom: '0.5rem' }}>
-            <strong>Quelle:</strong>{' '}
+            <strong>Source:</strong>{' '}
             <span
               style={{
                 color:

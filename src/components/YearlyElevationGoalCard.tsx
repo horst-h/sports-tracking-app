@@ -143,7 +143,7 @@ export default function YearlyElevationGoalCard({ sport, stats, forecast }: Prop
             <div className="forecast-header-metrics">
               <div className="forecast-metric-compact">
                 <span className="forecast-label">EoY Forecast</span>
-            GoalStatusHeader <span className="forecast-value">{Math.round(forecast.forecastEOY)} m</span>
+                <span className="forecast-value">{Math.round(forecast.forecastEOY)} m</span>
               </div>
               <div className="forecast-metric-compact">
                 <span className="forecast-label">

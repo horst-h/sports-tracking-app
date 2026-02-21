@@ -10,7 +10,7 @@ function yearRangeUnixSeconds(year: number) {
   return { after: Math.floor(start), before: Math.floor(end) };
 }
 
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h (kannst du ändern)
+const CACHE_TTL_MS = 3 * 60 * 60 * 1000; // 3h
 
 export function useActivities(year: number, enabled: boolean) {
   const [activities, setActivities] = useState<Activity[]>([]);
