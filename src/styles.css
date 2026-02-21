@@ -824,17 +824,6 @@ body {
   gap: 10px;
 }
 
-.forecast-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  width: fit-content;
-}
-
 .forecast-metrics {
   display: flex;
   gap: 14px;
@@ -925,12 +914,6 @@ body {
     grid-template-columns: 1fr auto;
     gap: 14px;
     align-items: flex-start;
-  }
-
-  .forecast-badge {
-    padding: 8px 12px;
-    font-size: 12px;
-    justify-self: end;
   }
 
   .forecast-header-metrics {

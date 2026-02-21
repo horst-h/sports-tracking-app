@@ -71,9 +71,12 @@ export default function GoalStatusHeader({ statusLabel, status, daysAhead, child
             borderRadius: "12px",
             border: "1px solid currentColor",
             opacity: 0.9,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
           }}
         >
-          <span className="status-badge__dot" aria-hidden="true"></span>
           <span>{statusLabel}</span>
         </div>
 
