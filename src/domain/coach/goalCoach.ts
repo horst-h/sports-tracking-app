@@ -149,8 +149,8 @@ function sanitizeResult(input: CoachInput, raw: any): CoachResult | null {
 
   const suggestionsRaw = Array.isArray(raw.suggestions) ? raw.suggestions : [];
   const suggestions = suggestionsRaw
-    .map((s) => sanitizeSuggestion(input, s, forecastStatus))
-    .filter((s): s is CoachSuggestion => Boolean(s))
+    .map((s: unknown) => sanitizeSuggestion(input, s, forecastStatus))
+    .filter((s: CoachSuggestion | null): s is CoachSuggestion => Boolean(s))
     .slice(0, 2);
 
   // Ensure no duplicates
