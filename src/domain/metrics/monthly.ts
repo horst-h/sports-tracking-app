@@ -9,6 +9,11 @@ export type MonthlySeriesItem = {
   total: number;
 };
 
+export type MonthlyTotalSeriesItem = {
+  month: string;
+  value: number;
+};
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export function buildMonthlySeries(params: {
@@ -40,6 +45,33 @@ export function buildMonthlySeries(params: {
       series[index].cycling += value;
     }
     series[index].total += value;
+  });
+
+  return series;
+}
+
+export function buildMonthlyTotalSeries(params: {
+  activities: NormalizedActivity[];
+  metric: HistoryMetric;
+  year?: number;
+}): MonthlyTotalSeriesItem[] {
+  const { activities, metric, year } = params;
+
+  const series: MonthlyTotalSeriesItem[] = MONTHS.map((month) => ({
+    month,
+    value: 0,
+  }));
+
+  activities.forEach((activity) => {
+    if (year && activity.year !== year) return;
+    const index = Math.max(0, Math.min(11, activity.month - 1));
+
+    let value = 0;
+    if (metric === "distance") value = activity.distanceKm;
+    if (metric === "elevation") value = activity.elevationM;
+    if (metric === "count") value = 1;
+
+    series[index].value += value;
   });
 
   return series;

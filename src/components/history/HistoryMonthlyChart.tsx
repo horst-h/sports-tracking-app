@@ -18,20 +18,7 @@ import { formatNumber } from "../../utils/format";
 type Props = {
   metric: HistoryMetric;
   data: MonthlySeriesItem[];
-  year?: number;
 };
-
-function metricLabel(metric: HistoryMetric): string {
-  if (metric === "distance") return "Distance";
-  if (metric === "elevation") return "Elevation";
-  return "Activities";
-}
-
-function unitLabel(metric: HistoryMetric): string {
-  if (metric === "distance") return "km";
-  if (metric === "elevation") return "m";
-  return "activities";
-}
 
 function formatTick(metric: HistoryMetric, value: number): string {
   if (metric === "distance") {
@@ -101,25 +88,12 @@ function RunningBarShape(props: RectangleProps & { payload?: MonthlySeriesItem }
   return <Rectangle {...rest} radius={radius} />;
 }
 
-export default function HistoryMonthlyChart({ metric, data, year }: Props) {
+export default function HistoryMonthlyChart({ metric, data }: Props) {
   const hasRunning = data.some((d) => d.running > 0);
   const hasCycling = data.some((d) => d.cycling > 0);
 
   return (
-    <div
-      style={{
-        background: "var(--surface)",
-        borderRadius: 12,
-        padding: "12px",
-        border: "1px solid var(--border)",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>{metricLabel(metric)}</div>
-        {year && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{year}</div>}
-      </div>
-      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{unitLabel(metric)}</div>
-
+    <>
       {!hasRunning && !hasCycling && (
         <div className="text-muted" style={{ marginTop: 16 }}>
           No data for this year.
@@ -182,6 +156,6 @@ export default function HistoryMonthlyChart({ metric, data, year }: Props) {
           </ResponsiveContainer>
         </div>
       )}
-    </div>
+    </>
   );
 }

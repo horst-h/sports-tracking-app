@@ -68,15 +68,16 @@ function formatActivitiesPerWeek(n: number): string {
 
 function sanitizeSuggestion(
   input: CoachInput,
-  suggestion: any,
+  suggestion: unknown,
   forecastStatus: ForecastStatus
 ): CoachSuggestion | null {
   if (!suggestion || typeof suggestion !== "object") return null;
+  const record = suggestion as Record<string, unknown>;
 
-  const label = typeof suggestion.label === "string" ? suggestion.label.trim() : "";
-  const rationale = typeof suggestion.rationale === "string" ? suggestion.rationale.trim() : "";
-  const unit = typeof suggestion.unit === "string" ? suggestion.unit : "";
-  const value = Number(suggestion.value);
+  const label = typeof record.label === "string" ? record.label.trim() : "";
+  const rationale = typeof record.rationale === "string" ? record.rationale.trim() : "";
+  const unit = typeof record.unit === "string" ? record.unit : "";
+  const value = Number(record.value);
 
   if (!label || !rationale) return null;
   if (!UNITS.has(unit)) return null;
@@ -87,7 +88,11 @@ function sanitizeSuggestion(
   const lowerBound = input.ytd > 0 ? input.ytd * 0.2 : 0;
 
   const isExtreme = value > upperBound || value < lowerBound;
-  let confidence = isExtreme ? "low" : suggestion.confidence;
+  const confidenceRaw = isExtreme ? "low" : (record.confidence as string | undefined);
+  const confidence: "low" | "medium" | "high" | undefined = 
+    confidenceRaw && ["low", "medium", "high"].includes(confidenceRaw) 
+      ? (confidenceRaw as "low" | "medium" | "high")
+      : undefined;
 
   // Deterministic logic enforcement
   const isMaintain = label.toLowerCase().includes("maintain");
@@ -105,7 +110,7 @@ function sanitizeSuggestion(
         value: input.trendPerWeek,
         unit: unit as CoachSuggestion["unit"],
         rationale,
-        confidence: confidence && ["low", "medium", "high"].includes(confidence) ? confidence : undefined,
+        confidence,
       };
     }
   }
@@ -122,7 +127,7 @@ function sanitizeSuggestion(
         value: input.trendPerWeek,
         unit: unit as CoachSuggestion["unit"],
         rationale,
-        confidence: confidence && ["low", "medium", "high"].includes(confidence) ? confidence : undefined,
+        confidence,
       };
     }
   }
@@ -132,22 +137,23 @@ function sanitizeSuggestion(
     value,
     unit: unit as CoachSuggestion["unit"],
     rationale,
-    confidence: confidence && ["low", "medium", "high"].includes(confidence) ? confidence : undefined,
+    confidence,
   };
 }
 
-function sanitizeResult(input: CoachInput, raw: any): CoachResult | null {
+function sanitizeResult(input: CoachInput, raw: unknown): CoachResult | null {
   if (!raw || typeof raw !== "object") return null;
+  const record = raw as Record<string, unknown>;
 
   const forecastStatus = computeForecastStatus(input);
 
-  const tone = typeof raw.tone === "string" && TONES.has(raw.tone) ? raw.tone : "unknown";
-  const headline = typeof raw.headline === "string" ? raw.headline.trim() : "";
-  const explanation = typeof raw.explanation === "string" ? raw.explanation.trim() : "";
+  const tone = typeof record.tone === "string" && TONES.has(record.tone) ? record.tone : "unknown";
+  const headline = typeof record.headline === "string" ? record.headline.trim() : "";
+  const explanation = typeof record.explanation === "string" ? record.explanation.trim() : "";
 
   if (!headline || !explanation) return null;
 
-  const suggestionsRaw = Array.isArray(raw.suggestions) ? raw.suggestions : [];
+  const suggestionsRaw = Array.isArray(record.suggestions) ? record.suggestions : [];
   const suggestions = suggestionsRaw
     .map((s: unknown) => sanitizeSuggestion(input, s, forecastStatus))
     .filter((s: CoachSuggestion | null): s is CoachSuggestion => Boolean(s))
@@ -163,7 +169,7 @@ function sanitizeResult(input: CoachInput, raw: any): CoachResult | null {
     }
   }
 
-  const crossSportNote = typeof raw.crossSportNote === "string" ? raw.crossSportNote.trim() : undefined;
+  const crossSportNote = typeof record.crossSportNote === "string" ? record.crossSportNote.trim() : undefined;
 
   return {
     tone: tone as CoachResult["tone"],

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Sparkles } from "lucide-react";
-import type { GoalMetric, Sport, YearGoals } from "../domain/metrics/types";
+import type { GoalMetric, Sport, StravaActivityLike, YearGoals } from "../domain/metrics/types";
 import { useGoals } from "../hooks/useGoals";
 import { useActivities } from "../hooks/useActivities";
 import { useAuth } from "../hooks/useAuth";
@@ -55,30 +55,34 @@ function emptyGoals(year: number): YearGoals {
   return { year, perSport: { run: {}, ride: {} } };
 }
 
-function toStravaLike(a: any) {
-  if (!a || typeof a !== "object") return a;
+function toStravaLike(a: unknown): StravaActivityLike | null {
+  if (!a || typeof a !== "object") return null;
+  const record = a as Record<string, unknown>;
 
-  if (typeof a.type === "string" && typeof a.start_date_local === "string" && typeof a.distance === "number") {
-    return a;
+  if (
+    typeof record.type === "string" &&
+    typeof record.start_date_local === "string" &&
+    typeof record.distance === "number"
+  ) {
+    return record as unknown as StravaActivityLike;
   }
 
   if (
-    (a.sport === "run" || a.sport === "ride") &&
-    typeof a.startDate === "string" &&
-    typeof a.distanceKm === "number"
+    (record.sport === "run" || record.sport === "ride") &&
+    typeof record.startDate === "string" &&
+    typeof record.distanceKm === "number"
   ) {
     return {
-      id: a.id,
-      type: a.sport === "run" ? "Run" : "Ride",
-      start_date_local: a.startDate,
-      distance: a.distanceKm * 1000,
-      total_elevation_gain: Number(a.elevationM ?? 0),
-      moving_time: Number(a.movingTimeSec ?? 0),
-      name: a.name,
-    };
+      id: record.id as string | number,
+      type: record.sport === "run" ? "Run" : "Ride",
+      start_date_local: record.startDate,
+      distance: record.distanceKm * 1000,
+      total_elevation_gain: Number(record.elevationM ?? 0),
+      moving_time: Number(record.movingTimeSec ?? 0),
+    } satisfies StravaActivityLike;
   }
 
-  return a;
+  return null;
 }
 
 export default function GoalsPage() {
@@ -99,18 +103,30 @@ export default function GoalsPage() {
     count: "",
     elevationM: "",
   });
-  const [coachStates, setCoachStates] = useState<Record<GoalMetric, CoachState>>({
-    distanceKm: { status: "idle" },
-    count: { status: "idle" },
-    elevationM: { status: "idle" },
+  const [coachStatesBySport, setCoachStatesBySport] = useState<
+    Record<Sport, Record<GoalMetric, CoachState>>
+  >({
+    run: {
+      distanceKm: { status: "idle" },
+      count: { status: "idle" },
+      elevationM: { status: "idle" },
+    },
+    ride: {
+      distanceKm: { status: "idle" },
+      count: { status: "idle" },
+      elevationM: { status: "idle" },
+    },
   });
-  const [goalOverrides, setGoalOverrides] = useState<Partial<Record<GoalMetric, number | undefined>>>({});
+  const [goalOverridesBySport, setGoalOverridesBySport] = useState<
+    Record<Sport, Partial<Record<GoalMetric, number | undefined>>>
+  >({ run: {}, ride: {} });
 
-  const currentGoals = useMemo(() => {
+  const currentGoals = useMemo<Partial<Record<GoalMetric, number>>>(() => {
     if (!isValidSport || !goals) return {};
     const baseGoals = goals.perSport?.[sport] ?? {};
-    return { ...baseGoals, ...goalOverrides };
-  }, [goals, sport, isValidSport, goalOverrides]);
+    const overrides = goalOverridesBySport[sport];
+    return { ...baseGoals, ...overrides };
+  }, [goals, sport, isValidSport, goalOverridesBySport]);
 
   const goalMeta: Record<GoalMetric, { goalType: CoachInput["goalType"]; unit: CoachInput["unit"] }> = {
     distanceKm: { goalType: "distance", unit: "km" },
@@ -124,8 +140,8 @@ export default function GoalsPage() {
     const asOfLocalIso = new Date().toISOString();
     const retrievedAtLocal = new Date().toString();
 
-    const stravaLike = activities.map(toStravaLike);
-    const normalized = normalizeActivities(stravaLike as any);
+    const stravaLike = activities.map(toStravaLike).filter((item): item is StravaActivityLike => !!item);
+    const normalized = normalizeActivities(stravaLike);
 
     function buildForSport(s: Sport) {
       const agg = aggregateYear(normalized, year, s, asOfLocalIso);
@@ -146,52 +162,11 @@ export default function GoalsPage() {
     };
   }, [activities, goals, isValidSport, year, token]);
 
-  if (!isValidSport) {
-    return (
-      <div className="container-page">
-        <div className="card card--primary" style={{ marginTop: "2rem" }}>
-          <div className="card__body">
-            <h2 style={{ color: "var(--text-muted)" }}>Invalid sport</h2>
-            <p style={{ marginTop: "1rem", marginBottom: "1rem" }}>
-              Sport <strong>{sportParam}</strong> is not valid. Valid sports: run, ride.
-            </p>
-            <button
-              onClick={() => navigate("/")}
-              style={{
-                padding: "0.75rem 1.5rem",
-                borderRadius: "0.5rem",
-                border: "1px solid var(--border)",
-                background: "var(--bg-secondary)",
-                cursor: "pointer",
-              }}
-            >
-              Back to dashboard
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const sportKey: Sport = sport;
-  const sportLabel = sport === "run" ? "Running" : "Cycling";
+  const sportKey: Sport = isValidSport ? sport : "run";
+  const sportLabel = sportKey === "run" ? "Running" : "Cycling";
   const otherSport: Sport = sportKey === "run" ? "ride" : "run";
   const stats = statsBySport ? statsBySport[sportKey] : null;
   const otherStats = statsBySport ? statsBySport[otherSport] : null;
-
-  useEffect(() => {
-    setCoachStates({
-      distanceKm: { status: "idle" },
-      count: { status: "idle" },
-      elevationM: { status: "idle" },
-    });
-    setGoalOverrides({});
-  }, [sportKey, year]);
-
-  useEffect(() => {
-    if (!goals) return;
-    setGoalOverrides({});
-  }, [goals]);
 
   async function saveGoalField(metric: GoalMetric, value: number | undefined) {
     const base = goals ?? emptyGoals(year);
@@ -220,13 +195,15 @@ export default function GoalsPage() {
       pendingSaveRef.current = null;
     }
 
-    setGoalOverrides((prev) => {
+    setGoalOverridesBySport((prev) => {
       const next = { ...prev };
+      const sportOverrides = { ...(next[sportKey] ?? {}) };
       if (typeof value === "number") {
-        next[metric] = value;
+        sportOverrides[metric] = value;
       } else {
-        delete next[metric];
+        delete sportOverrides[metric];
       }
+      next[sportKey] = sportOverrides;
       return next;
     });
   }
@@ -272,7 +249,13 @@ export default function GoalsPage() {
   }
 
   function setCoachState(metric: GoalMetric, next: CoachState) {
-    setCoachStates((prev) => ({ ...prev, [metric]: next }));
+    setCoachStatesBySport((prev) => ({
+      ...prev,
+      [sportKey]: {
+        ...prev[sportKey],
+        [metric]: next,
+      },
+    }));
   }
 
   async function handleApplySuggestion(metric: GoalMetric, rawValue: number) {
@@ -296,7 +279,7 @@ export default function GoalsPage() {
     setCoachState(metric, { status: "loading", goalValue });
 
     const otherProgress = otherStats?.progress[metric];
-    const otherGoalValue = (goals?.perSport?.[otherSport] as any)?.[metric] as number | undefined;
+    const otherGoalValue = goals?.perSport?.[otherSport]?.[metric];
     const input: CoachInput = {
       year,
       sport: sportKey,
@@ -338,23 +321,32 @@ export default function GoalsPage() {
     }
   }
 
-  useEffect(() => {
-    const values = {
-      distanceKm: (currentGoals as any)?.distanceKm as number | undefined,
-      count: (currentGoals as any)?.count as number | undefined,
-      elevationM: (currentGoals as any)?.elevationM as number | undefined,
-    };
-
-    setCoachStates((prev) => {
-      const next = { ...prev };
-      (Object.keys(values) as GoalMetric[]).forEach((metric) => {
-        if (prev[metric]?.goalValue !== values[metric]) {
-          next[metric] = { status: "idle" };
-        }
-      });
-      return next;
-    });
-  }, [(currentGoals as any)?.distanceKm, (currentGoals as any)?.count, (currentGoals as any)?.elevationM]);
+  if (!isValidSport) {
+    return (
+      <div className="container-page">
+        <div className="card card--primary" style={{ marginTop: "2rem" }}>
+          <div className="card__body">
+            <h2 style={{ color: "var(--text-muted)" }}>Invalid sport</h2>
+            <p style={{ marginTop: "1rem", marginBottom: "1rem" }}>
+              Sport <strong>{sportParam}</strong> is not valid. Valid sports: run, ride.
+            </p>
+            <button
+              onClick={() => navigate("/")}
+              style={{
+                padding: "0.75rem 1.5rem",
+                borderRadius: "0.5rem",
+                border: "1px solid var(--border)",
+                background: "var(--bg-secondary)",
+                cursor: "pointer",
+              }}
+            >
+              Back to dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container-page" style={{ paddingBottom: "2rem" }}>
@@ -379,10 +371,10 @@ export default function GoalsPage() {
       {!isLoading && (
         <div className="goals-grid">
           {GOAL_FIELDS.map((field) => {
-            const currentValue = (currentGoals as any)?.[field.key] as number | undefined;
+            const currentValue = currentGoals[field.key];
             const progress = stats?.progress[field.key];
             const hasGoalValue = typeof currentValue === "number" && currentValue > 0;
-            const coachState = coachStates[field.key];
+            const coachState = coachStatesBySport[sportKey][field.key];
             const coachStateMatches = coachState?.goalValue === currentValue;
             const coachStatus = coachStateMatches ? coachState.status : "idle";
             const coachResult = coachStateMatches ? coachState.result : undefined;

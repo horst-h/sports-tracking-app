@@ -443,6 +443,123 @@ body {
   background: rgba(255, 255, 255, 0.6);
 }
 
+.history-chart {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.history-chart__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.history-chart__title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.history-chart__unit {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.history-chart__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.history-chart__toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.04));
+  gap: 2px;
+}
+
+.history-chart__toggle-button {
+  border: 0;
+  background: transparent;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.history-chart__toggle-button--active {
+  background: #111827;
+  color: #fff;
+}
+
+.history-chart__toggle-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.history-chart__years {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.history-chart__hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.history-chart__compare-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.history-chart__compare-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.history-compare-chips {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding: 2px;
+}
+
+.history-compare-chip {
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.history-compare-chip--active {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
 .history-empty-title {
   margin: 0 0 8px;
 }

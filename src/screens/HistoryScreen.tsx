@@ -7,11 +7,14 @@ import { fetchYearActivitiesLive, useActivities } from "../hooks/useActivities";
 import { useAuth } from "../hooks/useAuth";
 import { normalizeActivities } from "../domain/metrics/normalize";
 import { aggregateYear } from "../domain/metrics/aggregate";
-import type { Sport } from "../domain/metrics/types";
-import { buildMonthlySeries, type HistoryMetric } from "../domain/metrics/monthly";
+import type { Sport, StravaActivityLike } from "../domain/metrics/types";
+import { buildMonthlySeries, buildMonthlyTotalSeries, type HistoryMetric } from "../domain/metrics/monthly";
 import { loadYearActivities } from "../repositories/activitiesRepository";
 import { formatNumber } from "../utils/format";
 import HistoryMonthlyChart from "../components/history/HistoryMonthlyChart";
+import HistoryMonthlyCompareChart, {
+  type MonthlyCompareSeriesItem,
+} from "../components/history/HistoryMonthlyCompareChart";
 
 const TAB_OPTIONS = ["Distance", "Activities", "Elevation"] as const;
 
@@ -28,30 +31,34 @@ type SportSummary = {
   totals: SummaryTotals;
 };
 
-function toStravaLike(a: any) {
-  if (!a || typeof a !== "object") return a;
+function toStravaLike(a: unknown): StravaActivityLike | null {
+  if (!a || typeof a !== "object") return null;
+  const record = a as Record<string, unknown>;
 
-  if (typeof a.type === "string" && typeof a.start_date_local === "string" && typeof a.distance === "number") {
-    return a;
+  if (
+    typeof record.type === "string" &&
+    typeof record.start_date_local === "string" &&
+    typeof record.distance === "number"
+  ) {
+    return record as unknown as StravaActivityLike;
   }
 
   if (
-    (a.sport === "run" || a.sport === "ride") &&
-    typeof a.startDate === "string" &&
-    typeof a.distanceKm === "number"
+    (record.sport === "run" || record.sport === "ride") &&
+    typeof record.startDate === "string" &&
+    typeof record.distanceKm === "number"
   ) {
     return {
-      id: a.id,
-      type: a.sport === "run" ? "Run" : "Ride",
-      start_date_local: a.startDate,
-      distance: a.distanceKm * 1000,
-      total_elevation_gain: Number(a.elevationM ?? 0),
-      moving_time: Number(a.movingTimeSec ?? 0),
-      name: a.name,
-    };
+      id: record.id as string | number,
+      type: record.sport === "run" ? "Run" : "Ride",
+      start_date_local: record.startDate,
+      distance: record.distanceKm * 1000,
+      total_elevation_gain: Number(record.elevationM ?? 0),
+      moving_time: Number(record.movingTimeSec ?? 0),
+    } satisfies StravaActivityLike;
   }
 
-  return a;
+  return null;
 }
 
 
@@ -139,6 +146,35 @@ function CategoryTabs({ value, onChange }: { value: TabOption; onChange: (next: 
   );
 }
 
+function metricLabel(metric: HistoryMetric): string {
+  if (metric === "distance") return "Distance";
+  if (metric === "elevation") return "Elevation";
+  return "Activities";
+}
+
+function unitLabel(metric: HistoryMetric): string {
+  if (metric === "distance") return "km";
+  if (metric === "elevation") return "m";
+  return "activities";
+}
+
+function defaultCompareYear(primaryYear: number, years: number[]): number | null {
+  const candidates = years.filter((year) => year !== primaryYear);
+  if (candidates.length === 0) return null;
+
+  const previousYear = primaryYear - 1;
+  if (candidates.includes(previousYear)) return previousYear;
+
+  return candidates.reduce((closest, year) => {
+    const closestDistance = Math.abs(closest - primaryYear);
+    const currentDistance = Math.abs(year - primaryYear);
+
+    if (currentDistance < closestDistance) return year;
+    if (currentDistance === closestDistance && year < closest) return year;
+    return closest;
+  }, candidates[0]);
+}
+
 export default function HistoryScreen() {
   const navigate = useNavigate();
   const { year: yearParam } = useParams();
@@ -150,6 +186,8 @@ export default function HistoryScreen() {
   const [yearsError, setYearsError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<TabOption>("Distance");
+  const [chartMode, setChartMode] = useState<"single" | "compare">("single");
+  const [compareYear, setCompareYear] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,8 +226,8 @@ export default function HistoryScreen() {
             break;
           }
         }
-      } catch (e: any) {
-        if (!cancelled) setYearsError(String(e?.message ?? e));
+      } catch (e: unknown) {
+        if (!cancelled) setYearsError(String(e instanceof Error ? e.message : e));
       } finally {
         if (!cancelled) setYearsLoading(false);
       }
@@ -227,9 +265,23 @@ export default function HistoryScreen() {
   }, [availableYears, selectedYear]);
 
   const selectedYearValue = selectedYear ?? currentYear;
+  const compareYearOptions = useMemo(
+    () => displayYears.filter((year) => year !== selectedYearValue),
+    [displayYears, selectedYearValue]
+  );
+  const compareDisabled = compareYearOptions.length === 0;
   const enabled = !!token && !!selectedYear;
   const allowLive = selectedYear ? !availableYears.includes(selectedYear) : false;
   const { activities, loading, error, source } = useActivities(selectedYearValue, enabled, { allowLive });
+
+  const compareEnabled = !!token && chartMode === "compare" && !!compareYear;
+  const compareAllowLive = compareYear ? !availableYears.includes(compareYear) : false;
+  const {
+    activities: compareActivities,
+    loading: compareLoading,
+    error: compareError,
+    source: compareSource,
+  } = useActivities(compareYear ?? selectedYearValue, compareEnabled, { allowLive: compareAllowLive });
 
   useEffect(() => {
     if (source !== "live") return;
@@ -238,11 +290,46 @@ export default function HistoryScreen() {
     }
   }, [source, selectedYear, availableYears]);
 
+  useEffect(() => {
+    if (compareSource !== "live") return;
+    if (compareYear && !availableYears.includes(compareYear)) {
+      setAvailableYears((prev) => [...new Set([...prev, compareYear])].sort((a, b) => b - a));
+    }
+  }, [compareSource, compareYear, availableYears]);
+
+  useEffect(() => {
+    if (compareDisabled) {
+      if (chartMode === "compare") setChartMode("single");
+      if (compareYear !== null) setCompareYear(null);
+      return;
+    }
+
+    if (chartMode !== "compare") return;
+
+    if (!compareYear || compareYear === selectedYearValue || !compareYearOptions.includes(compareYear)) {
+      const nextDefault = defaultCompareYear(selectedYearValue, displayYears);
+      setCompareYear(nextDefault);
+    }
+  }, [
+    chartMode,
+    compareDisabled,
+    compareYear,
+    compareYearOptions,
+    displayYears,
+    selectedYearValue,
+  ]);
+
   const normalizedActivities = useMemo(() => {
     if (!activities || activities.length === 0 || !selectedYear) return null;
-    const stravaLike = activities.map(toStravaLike);
-    return normalizeActivities(stravaLike as any);
+    const stravaLike = activities.map(toStravaLike).filter((item): item is StravaActivityLike => !!item);
+    return normalizeActivities(stravaLike);
   }, [activities, selectedYear]);
+
+  const normalizedCompareActivities = useMemo(() => {
+    if (!compareActivities || compareActivities.length === 0 || !compareYear) return null;
+    const stravaLike = compareActivities.map(toStravaLike).filter((item): item is StravaActivityLike => !!item);
+    return normalizeActivities(stravaLike);
+  }, [compareActivities, compareYear]);
 
   const summaries = useMemo(() => {
     if (!normalizedActivities || !selectedYear) return null;
@@ -270,12 +357,41 @@ export default function HistoryScreen() {
     });
   }, [normalizedActivities, selectedMetric, selectedYear, currentYear]);
 
+  const primaryTotalSeries = useMemo(() => {
+    return buildMonthlyTotalSeries({
+      activities: normalizedActivities ?? [],
+      metric: selectedMetric,
+      year: selectedYear ?? currentYear,
+    });
+  }, [normalizedActivities, selectedMetric, selectedYear, currentYear]);
+
+  const secondaryTotalSeries = useMemo(() => {
+    return buildMonthlyTotalSeries({
+      activities: normalizedCompareActivities ?? [],
+      metric: selectedMetric,
+      year: compareYear ?? currentYear,
+    });
+  }, [normalizedCompareActivities, selectedMetric, compareYear, currentYear]);
+
+  const compareSeries: MonthlyCompareSeriesItem[] = useMemo(() => {
+    return primaryTotalSeries.map((item, index) => {
+      const secondaryValue = secondaryTotalSeries[index]?.value ?? 0;
+      return {
+        month: item.month,
+        primary: item.value,
+        secondary: secondaryValue,
+        delta: secondaryValue - item.value,
+      };
+    });
+  }, [primaryTotalSeries, secondaryTotalSeries]);
+
   if (!token) {
     return <LoginCard />;
   }
 
-  const showLoading = yearsLoading || loading;
-  const showEmpty = !showLoading && !error && !yearsError && (!activities || activities.length === 0);
+  const showLoading = yearsLoading || loading || (chartMode === "compare" && compareLoading);
+  const activeError = yearsError ?? error ?? (chartMode === "compare" ? compareError : null);
+  const showEmpty = !showLoading && !activeError && (!activities || activities.length === 0);
 
   return (
     <div className="history-page">
@@ -310,10 +426,10 @@ export default function HistoryScreen() {
             </div>
           </div>
         )}
-        {(error || yearsError) && (
+        {activeError && (
           <div className="card card--primary">
             <div className="card__body">
-              <p className="text-error">{error ?? yearsError}</p>
+              <p className="text-error">{activeError}</p>
             </div>
           </div>
         )}
@@ -341,11 +457,85 @@ export default function HistoryScreen() {
               <div className="card__body history-tabs__body">
                 <CategoryTabs value={activeTab} onChange={setActiveTab} />
                 <div className="history-panel" role="tabpanel">
-                  <HistoryMonthlyChart
-                    metric={selectedMetric}
-                    data={monthlySeries}
-                    year={selectedYearValue}
-                  />
+                  <div className="history-chart">
+                    <div className="history-chart__header">
+                      <div>
+                        <div className="history-chart__title">{metricLabel(selectedMetric)}</div>
+                        <div className="history-chart__unit">{unitLabel(selectedMetric)}</div>
+                      </div>
+                      <div className="history-chart__controls">
+                        <div className="history-chart__toggle" role="group" aria-label="Chart mode">
+                          <button
+                            type="button"
+                            className={`history-chart__toggle-button${
+                              chartMode === "single" ? " history-chart__toggle-button--active" : ""
+                            }`}
+                            onClick={() => setChartMode("single")}
+                            aria-pressed={chartMode === "single"}
+                          >
+                            Single
+                          </button>
+                          <button
+                            type="button"
+                            className={`history-chart__toggle-button${
+                              chartMode === "compare" ? " history-chart__toggle-button--active" : ""
+                            }`}
+                            onClick={() => setChartMode("compare")}
+                            aria-pressed={chartMode === "compare"}
+                            disabled={compareDisabled}
+                          >
+                            Compare
+                          </button>
+                        </div>
+                        <div className="history-chart__years">
+                          {chartMode === "compare" && compareYear
+                            ? `${selectedYearValue} vs ${compareYear}`
+                            : selectedYearValue}
+                        </div>
+                      </div>
+                    </div>
+
+                    {compareDisabled && (
+                      <div className="history-chart__hint">Not enough years to compare.</div>
+                    )}
+
+                    {chartMode === "compare" && compareYear && (
+                      <div className="history-chart__compare-row">
+                        <div className="history-chart__compare-label">Compare to</div>
+                        <div className="history-compare-chips" role="list">
+                          {compareYearOptions.map((year) => {
+                            const isActive = year === compareYear;
+                            return (
+                              <button
+                                key={year}
+                                type="button"
+                                className={`history-compare-chip${
+                                  isActive ? " history-compare-chip--active" : ""
+                                }`}
+                                onClick={() => setCompareYear(year)}
+                                aria-pressed={isActive}
+                              >
+                                {year}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="history-chart__body">
+                      {chartMode === "compare" && compareYear ? (
+                        <HistoryMonthlyCompareChart
+                          metric={selectedMetric}
+                          data={compareSeries}
+                          primaryYear={selectedYearValue}
+                          secondaryYear={compareYear}
+                        />
+                      ) : (
+                        <HistoryMonthlyChart metric={selectedMetric} data={monthlySeries} />
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
