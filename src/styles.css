@@ -1272,3 +1272,109 @@ body {
 .goal-field__status--error {
   color: var(--status-under);
 }
+
+.goal-coach {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.goal-coach__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0.35rem 0.6rem;
+  font-size: 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.goal-coach__button:hover {
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.04));
+  color: var(--text);
+}
+
+.goal-coach__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.goal-coach__feedback {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.goal-coach__feedback--error {
+  color: var(--status-under);
+}
+
+.goal-coach__headline {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.goal-coach__explanation,
+.goal-coach__cross {
+  margin: 0;
+}
+
+.goal-coach__cross {
+  font-style: italic;
+}
+
+.goal-coach__timestamp {
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+.goal-coach__suggestions {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.goal-coach__suggestion {
+  padding: 0.5rem 0.65rem;
+  border-radius: 10px;
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.04));
+}
+
+.goal-coach__suggestion-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.goal-coach__suggestion-note {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.goal-coach__actions {
+  margin-top: 0.35rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.goal-coach__apply,
+.goal-coach__retry {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  padding: 0.25rem 0.6rem;
+  font-size: 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.goal-coach__apply:hover,
+.goal-coach__retry:hover {
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.04));
+}

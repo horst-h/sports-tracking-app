@@ -99,12 +99,14 @@ export default function GoalField({
   }
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     return () => {
       isMountedRef.current = false;
       const parsed = parseValue(latestValueRef.current);
       void triggerSave(parsed, { silent: true });
     };
-  }, [allowDecimal]);
+  }, []);
 
   function getStatusElement() {
     if (saveState === "saving") {

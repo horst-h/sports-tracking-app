@@ -34,3 +34,16 @@ export async function fetchAnalyzeNarrativeViaProxy(args: {
   if (!res.ok) throw new Error(`Analyze narrative proxy error ${res.status}`);
   return (await res.json()) as AnalyzeNarrative;
 }
+
+export async function fetchGoalCoachViaProxy(args: {
+  input: unknown;
+}): Promise<unknown> {
+  const res = await fetch("/.netlify/functions/goalCoach", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input: args.input }),
+  });
+
+  if (!res.ok) throw new Error(`Goal coach proxy error ${res.status}`);
+  return (await res.json()) as unknown;
+}
