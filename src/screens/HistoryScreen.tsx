@@ -8,8 +8,10 @@ import { useAuth } from "../hooks/useAuth";
 import { normalizeActivities } from "../domain/metrics/normalize";
 import { aggregateYear } from "../domain/metrics/aggregate";
 import type { Sport } from "../domain/metrics/types";
+import { buildMonthlySeries, type HistoryMetric } from "../domain/metrics/monthly";
 import { loadYearActivities } from "../repositories/activitiesRepository";
 import { formatNumber } from "../utils/format";
+import HistoryMonthlyChart from "../components/history/HistoryMonthlyChart";
 
 const TAB_OPTIONS = ["Distance", "Activities", "Elevation"] as const;
 
@@ -236,20 +238,37 @@ export default function HistoryScreen() {
     }
   }, [source, selectedYear, availableYears]);
 
-  const summaries = useMemo(() => {
+  const normalizedActivities = useMemo(() => {
     if (!activities || activities.length === 0 || !selectedYear) return null;
-
     const stravaLike = activities.map(toStravaLike);
-    const normalized = normalizeActivities(stravaLike as any);
+    return normalizeActivities(stravaLike as any);
+  }, [activities, selectedYear]);
 
-    const runAgg = aggregateYear(normalized, selectedYear, "run");
-    const rideAgg = aggregateYear(normalized, selectedYear, "ride");
+  const summaries = useMemo(() => {
+    if (!normalizedActivities || !selectedYear) return null;
+
+    const runAgg = aggregateYear(normalizedActivities, selectedYear, "run");
+    const rideAgg = aggregateYear(normalizedActivities, selectedYear, "ride");
 
     return [
       { sport: "run", totals: runAgg.totals },
       { sport: "ride", totals: rideAgg.totals },
     ] satisfies SportSummary[];
-  }, [activities, selectedYear]);
+  }, [normalizedActivities, selectedYear]);
+
+  const selectedMetric: HistoryMetric = useMemo(() => {
+    if (activeTab === "Distance") return "distance";
+    if (activeTab === "Elevation") return "elevation";
+    return "count";
+  }, [activeTab]);
+
+  const monthlySeries = useMemo(() => {
+    return buildMonthlySeries({
+      activities: normalizedActivities ?? [],
+      metric: selectedMetric,
+      year: selectedYear ?? currentYear,
+    });
+  }, [normalizedActivities, selectedMetric, selectedYear, currentYear]);
 
   if (!token) {
     return <LoginCard />;
@@ -322,7 +341,11 @@ export default function HistoryScreen() {
               <div className="card__body history-tabs__body">
                 <CategoryTabs value={activeTab} onChange={setActiveTab} />
                 <div className="history-panel" role="tabpanel">
-                  Chart coming soon for {activeTab}.
+                  <HistoryMonthlyChart
+                    metric={selectedMetric}
+                    data={monthlySeries}
+                    year={selectedYearValue}
+                  />
                 </div>
               </div>
             </div>
