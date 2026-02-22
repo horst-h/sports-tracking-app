@@ -12,7 +12,34 @@ function yearRangeUnixSeconds(year: number) {
 
 const CACHE_TTL_MS = 3 * 60 * 60 * 1000; // 3h
 
-export function useActivities(year: number, enabled: boolean) {
+export async function fetchYearActivitiesLive(year: number): Promise<Activity[]> {
+  const { after, before } = yearRangeUnixSeconds(year);
+
+  const perPage = 50;
+  const all: Activity[] = [];
+
+  for (let page = 1; ; page++) {
+    const raw = await stravaClient.listActivities({ page, perPage, after, before });
+    if (raw.length === 0) break;
+
+    for (const r of raw) {
+      const mapped = toDomainActivity(r);
+      if (mapped) all.push(mapped);
+    }
+
+    // safety: Strava max is usually 200 per_page; with 50 this is fine.
+    if (raw.length < perPage) break;
+  }
+
+  await saveYearActivities(year, all);
+  return all;
+}
+
+type UseActivitiesOptions = {
+  allowLive?: boolean;
+};
+
+export function useActivities(year: number, enabled: boolean, options?: UseActivitiesOptions) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -22,6 +49,7 @@ export function useActivities(year: number, enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
+    const allowLive = options?.allowLive ?? true;
 
     (async () => {
       // 1) Cache laden
@@ -33,6 +61,16 @@ export function useActivities(year: number, enabled: boolean) {
 
       // 2) Entscheiden ob Refresh nötig
       const isStale = !cached || Date.now() - cached.fetchedAt > CACHE_TTL_MS;
+
+      if (!allowLive) {
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+          setError(null);
+          if (!cached) setSource("empty");
+        }
+        return;
+      }
 
       // Beim ersten Mal ohne Cache: "loading", sonst "refreshing"
       if (!cached) setLoading(true);
@@ -50,30 +88,12 @@ export function useActivities(year: number, enabled: boolean) {
       // 3) Live laden (nur dieses Jahr)
       try {
         setError(null);
-        const { after, before } = yearRangeUnixSeconds(year);
-
-        const perPage = 50;
-        const all: Activity[] = [];
-
-        for (let page = 1; ; page++) {
-          const raw = await stravaClient.listActivities({ page, perPage, after, before });
-          if (raw.length === 0) break;
-
-          for (const r of raw) {
-            const mapped = toDomainActivity(r);
-            if (mapped) all.push(mapped);
-          }
-
-          // safety: Strava max is usually 200 per_page; with 50 this is fine.
-          if (raw.length < perPage) break;
-        }
+        const all = await fetchYearActivitiesLive(year);
 
         if (!cancelled) {
           setActivities(all);
           setSource("live");
         }
-
-        await saveYearActivities(year, all);
       } catch (e: any) {
         if (!cancelled) setError(String(e?.message ?? e));
       } finally {
@@ -87,7 +107,7 @@ export function useActivities(year: number, enabled: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [year, enabled]);
+  }, [year, enabled, options?.allowLive]);
 
   return { activities, loading, refreshing, error, source };
 }

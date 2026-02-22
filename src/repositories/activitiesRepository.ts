@@ -28,3 +28,11 @@ export async function clearYearActivities(year: number) {
   const d = await openSportsDB();
   await d.delete(STORE, year);
 }
+
+export async function listCachedYears(): Promise<number[]> {
+  const d = await openSportsDB();
+  const keys = await d.getAllKeys(STORE);
+  return keys
+    .map((key) => Number(key))
+    .filter((key) => Number.isFinite(key));
+}

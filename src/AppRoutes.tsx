@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import App from './App'
 import AnalyzePage from './pages/AnalyzePage'
 import GoalsPage from './pages/GoalsPage'
+import HistoryScreen from './screens/HistoryScreen'
 
 export default function AppRoutes() {
   return (
@@ -15,6 +16,10 @@ export default function AppRoutes() {
       {/* Goals: unified page per sport with all goal categories */}
       <Route path="/goals" element={<Navigate to="/goals/run" replace />} />
       <Route path="/goals/:sport" element={<GoalsPage />} />
+
+      {/* History: past years overview */}
+      <Route path="/history" element={<HistoryScreen />} />
+      <Route path="/history/:year" element={<HistoryScreen />} />
       
       {/* Catch-all: 404 fallback to home */}
       <Route path="*" element={<App />} />

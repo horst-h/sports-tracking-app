@@ -137,7 +137,7 @@ export default function GoalsPage() {
         aria-label="Back to dashboard"
       >
         <ArrowLeft size={18} />
-        Back to dashboard
+        Back
       </button>
 
       <h1 className="goals-title">

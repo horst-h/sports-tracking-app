@@ -338,6 +338,25 @@ export default function App() {
               Manage goals
             </button>
 
+            <button
+              type="button"
+              onClick={() => {
+                setSettingsOpen(false);
+                navigate("/history");
+              }}
+              aria-label="Activity history"
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.5rem",
+                border: "1px solid var(--border)",
+                background: "var(--bg-secondary)",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              Activity History
+            </button>
+
             <div style={{ color: "var(--text-muted)", fontSize: "14px" }}>
               More quick settings coming here.
             </div>
