@@ -9,6 +9,7 @@ import { normalizeActivities } from "../domain/metrics/normalize";
 import { aggregateYear } from "../domain/metrics/aggregate";
 import type { Sport } from "../domain/metrics/types";
 import { loadYearActivities } from "../repositories/activitiesRepository";
+import { formatNumber } from "../utils/format";
 
 const TAB_OPTIONS = ["Distance", "Activities", "Elevation"] as const;
 
@@ -51,9 +52,6 @@ function toStravaLike(a: any) {
   return a;
 }
 
-function formatNumber(value: number, maximumFractionDigits = 0) {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits }).format(value);
-}
 
 function YearChips({
   years,
@@ -103,7 +101,7 @@ function SportSummaryCard({ summary }: { summary: SportSummary }) {
         <div className="history-summary__item">
           <div className="history-summary__label">Distance</div>
           <div className="history-summary__value">
-            {formatNumber(summary.totals.distanceKm, 1)} km
+            {formatNumber(summary.totals.distanceKm, { maximumFractionDigits: 1 })} km
           </div>
         </div>
         <div className="history-summary__item">

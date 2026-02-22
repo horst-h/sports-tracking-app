@@ -17,6 +17,7 @@ import {
   type CoachResult,
   type CoachState,
 } from "../domain/coach/goalCoach";
+import { formatNumber } from "../utils/format";
 
 const VALID_SPORTS: Sport[] = ["run", "ride"];
 
@@ -245,19 +246,13 @@ export default function GoalsPage() {
 
   const isLoading = goalsLoading || activitiesLoading;
 
-  function formatNumber(value: number, precision = 1): string {
-    return value.toLocaleString("en-US", {
-      useGrouping: false,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: precision,
-    });
-  }
-
   function formatSuggestionValue(suggestion: { value: number; unit: string }, isCount: boolean): string {
     if (suggestion.unit === "count") {
-      return `${formatNumber(suggestion.value, 0)} ${formatActivitiesPerWeek(suggestion.value)}`;
+      return `${formatNumber(suggestion.value, { maximumFractionDigits: 0 })} ${formatActivitiesPerWeek(
+        suggestion.value
+      )}`;
     }
-    return `${formatNumber(suggestion.value, isCount ? 0 : 1)} ${suggestion.unit}`;
+    return `${formatNumber(suggestion.value, { maximumFractionDigits: isCount ? 0 : 1 })} ${suggestion.unit}`;
   }
 
   function formatTimestamp(value?: string) {
@@ -463,7 +458,7 @@ export default function GoalsPage() {
                                         className="goal-coach__apply"
                                         onClick={() => handleApplySuggestion(field.key, suggestion.value)}
                                       >
-                                        Apply {formatNumber(suggestion.value, field.key === "count" ? 0 : 1)} {suggestion.unit === "count" ? "activities" : suggestion.unit}
+                                        Apply {formatNumber(suggestion.value, { maximumFractionDigits: field.key === "count" ? 0 : 1 })} {suggestion.unit === "count" ? "activities" : suggestion.unit}
                                       </button>
                                     </div>
                                   )}
@@ -491,13 +486,13 @@ export default function GoalsPage() {
                         <div>
                           <div style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>YTD</div>
                           <div style={{ fontSize: "1.125rem", fontWeight: 600 }}>
-                            {formatNumber(progress.ytd, field.key === "count" ? 0 : 1)} {field.unit}
+                            {formatNumber(progress.ytd, { maximumFractionDigits: field.key === "count" ? 0 : 1 })} {field.unit}
                           </div>
                         </div>
                         <div>
                           <div style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>Year-End Forecast</div>
                           <div style={{ fontSize: "1.125rem", fontWeight: 600 }}>
-                            {formatNumber(progress.forecast, field.key === "count" ? 0 : 1)} {field.unit}
+                            {formatNumber(progress.forecast, { maximumFractionDigits: field.key === "count" ? 0 : 1 })} {field.unit}
                           </div>
                         </div>
                       </div>
@@ -505,7 +500,7 @@ export default function GoalsPage() {
                         <div>
                           <div style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>Trend per week</div>
                           <div style={{ fontSize: "1rem", fontWeight: 500 }}>
-                            {formatNumber(progress.avgPerWeek, field.key === "count" ? 0 : 1)} {field.unit}
+                            {formatNumber(progress.avgPerWeek, { maximumFractionDigits: field.key === "count" ? 0 : 1 })} {field.unit}
                           </div>
                         </div>
                       </div>
