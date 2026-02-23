@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import App from './App'
 import AnalyzePage from './pages/AnalyzePage'
-import GoalsPage from './pages/GoalsPage'
+import GoalsScreen from './screens/GoalsScreen'
 import HistoryScreen from './screens/HistoryScreen'
 
 export default function AppRoutes() {
@@ -13,9 +13,10 @@ export default function AppRoutes() {
       {/* Analyze: detailed metrics & narrative insights */}
       <Route path="/analyze/:sport/:metric" element={<AnalyzePage />} />
 
-      {/* Goals: unified page per sport with all goal categories */}
-      <Route path="/goals" element={<Navigate to="/goals/run" replace />} />
-      <Route path="/goals/:sport" element={<GoalsPage />} />
+      {/* Goals: unified screen with sport tabs */}
+      <Route path="/goals" element={<GoalsScreen />} />
+      {/* Redirect old sport-specific routes */}
+      <Route path="/goals/:sport" element={<Navigate to="/goals" replace />} />
 
       {/* History: past years overview */}
       <Route path="/history" element={<HistoryScreen />} />

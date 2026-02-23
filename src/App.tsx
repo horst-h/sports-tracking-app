@@ -323,9 +323,9 @@ export default function App() {
               type="button"
               onClick={() => {
                 setSettingsOpen(false);
-                navigate(`/goals/${sport}`, { state: { sport } });
+                navigate("/goals");
               }}
-              aria-label="Manage goals"
+              aria-label="Goals"
               style={{
                 padding: "0.75rem 1rem",
                 borderRadius: "0.5rem",
@@ -335,7 +335,7 @@ export default function App() {
                 fontWeight: 600,
               }}
             >
-              Manage goals
+              Goals
             </button>
 
             <button

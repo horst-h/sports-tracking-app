@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { BarChart3, Pencil } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import type { UiAthleteStats } from "../domain/metrics/uiStats";
 import type { Sport } from "../domain/metrics/types";
 import type { ForecastResult } from "../domain/metrics/forecast";
@@ -108,35 +108,6 @@ export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
                 }}
               >
                 <BarChart3 size={18} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/goals/${sport}`);
-                }}
-                aria-label="Edit units goal"
-                style={{
-                  padding: "6px",
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  color: "var(--text-muted)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "4px",
-                  transition: "color 0.2s, background 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--bg-secondary)";
-                  e.currentTarget.style.color = "var(--text)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = "var(--text-muted)";
-                }}
-              >
-                <Pencil size={18} />
               </button>
             </div>
           </GoalStatusHeader>

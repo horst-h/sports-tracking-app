@@ -19,6 +19,28 @@ export type CoachInput = {
   };
 };
 
+export type MultiCategoryGoalData = {
+  goalValue: number | null;
+  ytd: number;
+  trendPerWeek: number;
+  yearEndForecast: number;
+};
+
+export type MultiCategoryCoachInput = {
+  year: number;
+  sport: "run" | "ride";
+  remainingWeeks: number;
+  categories: {
+    distanceKm: MultiCategoryGoalData;
+    count: MultiCategoryGoalData;
+    elevationM: MultiCategoryGoalData;
+  };
+  otherSport?: {
+    sport: "run" | "ride";
+    summary: string; // brief summary like "145 km YTD, trending 12 km/week"
+  };
+};
+
 export type CoachSuggestion = {
   label: string;
   value: number;
@@ -187,6 +209,45 @@ export async function getGoalCoachFeedback(input: CoachInput): Promise<CoachResu
     throw new Error("Invalid AI coach response");
   }
   return cleaned;
+}
+
+export type MultiCategoryCategoryResult = {
+  status: "set" | "missing";
+  feedback: string;
+  suggestion: number | null;
+};
+
+export type MultiCategoryCoachResult = {
+  sport: string;
+  year: number;
+  summary: string;
+  categories: {
+    distanceKm: MultiCategoryCategoryResult;
+    count: MultiCategoryCategoryResult;
+    elevationM: MultiCategoryCategoryResult;
+  };
+  crossSportNote?: string;
+};
+
+export async function getMultiCategoryGoalCoachFeedback(
+  input: MultiCategoryCoachInput
+): Promise<MultiCategoryCoachResult> {
+  const raw = await fetchGoalCoachViaProxy({ input, multiCategory: true });
+  
+  // Basic validation
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Invalid AI coach response");
+  }
+  
+  const record = raw as Record<string, unknown>;
+  const categories = record.categories as Record<string, unknown>;
+  
+  if (!categories || typeof categories !== "object") {
+    throw new Error("Invalid AI coach response: missing categories");
+  }
+  
+  // Return with minimal sanitization - the backend should return valid JSON
+  return raw as MultiCategoryCoachResult;
 }
 
 export { formatActivitiesPerWeek, formatUnitPerWeek };

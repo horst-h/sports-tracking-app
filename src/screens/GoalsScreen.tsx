@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import type { GoalMetric, Sport, StravaActivityLike, YearGoals } from "../domain/metrics/types";
 import { useGoals } from "../hooks/useGoals";
@@ -11,8 +11,8 @@ import { aggregateYear } from "../domain/metrics/aggregate";
 import { buildUiAthleteStats, type UiAthleteStats } from "../domain/metrics/uiStats";
 import GoalField from "../components/GoalField";
 import GoalsCentralAiCoach from "../components/GoalsCentralAiCoach";
-
-const VALID_SPORTS: Sport[] = ["run", "ride"];
+import RunningIcon from "../components/icons/RunningIcon";
+import CyclingIcon from "../components/icons/CyclingIcon";
 
 const GOAL_FIELDS: Array<{
   key: GoalMetric;
@@ -78,15 +78,13 @@ function toStravaLike(a: unknown): StravaActivityLike | null {
   return null;
 }
 
-export default function GoalsPage() {
+export default function GoalsScreen() {
   const navigate = useNavigate();
-  const { sport: sportParam } = useParams();
-
-  const sport = sportParam as Sport | undefined;
-  const isValidSport = sport && VALID_SPORTS.includes(sport);
-
   const year = new Date().getFullYear();
   const { token } = useAuth();
+  
+  const [selectedSport, setSelectedSport] = useState<Sport>("run");
+  
   const { goals, loading: goalsLoading } = useGoals(year);
   const { activities, loading: activitiesLoading } = useActivities(year, !!token);
   const pendingSaveRef = useRef<Promise<void> | null>(null);
@@ -95,14 +93,14 @@ export default function GoalsPage() {
   >({ run: {}, ride: {} });
 
   const currentGoals = useMemo<Partial<Record<GoalMetric, number>>>(() => {
-    if (!isValidSport || !goals) return {};
-    const baseGoals = goals.perSport?.[sport] ?? {};
-    const overrides = goalOverridesBySport[sport];
+    if (!goals) return {};
+    const baseGoals = goals.perSport?.[selectedSport] ?? {};
+    const overrides = goalOverridesBySport[selectedSport];
     return { ...baseGoals, ...overrides };
-  }, [goals, sport, isValidSport, goalOverridesBySport]);
+  }, [goals, selectedSport, goalOverridesBySport]);
 
   const statsBySport = useMemo((): Record<Sport, UiAthleteStats> | null => {
-    if (!isValidSport || !activities || !token) return null;
+    if (!activities || !token) return null;
 
     const asOfLocalIso = new Date().toISOString();
     const retrievedAtLocal = new Date().toString();
@@ -127,18 +125,16 @@ export default function GoalsPage() {
       run: buildForSport("run"),
       ride: buildForSport("ride"),
     };
-  }, [activities, goals, isValidSport, year, token]);
+  }, [activities, goals, year, token]);
 
-  const sportKey: Sport = isValidSport ? sport : "run";
-  const sportLabel = sportKey === "run" ? "Running" : "Cycling";
-  const otherSport: Sport = sportKey === "run" ? "ride" : "run";
-  const stats = statsBySport ? statsBySport[sportKey] : null;
+  const otherSport: Sport = selectedSport === "run" ? "ride" : "run";
+  const stats = statsBySport ? statsBySport[selectedSport] : null;
   const otherStats = statsBySport ? statsBySport[otherSport] : null;
 
   async function saveGoalField(metric: GoalMetric, value: number | undefined) {
     const base = goals ?? emptyGoals(year);
     const perSport = { ...base.perSport };
-    const currentSport = { ...(perSport[sportKey] ?? {}) } as Record<GoalMetric, number>;
+    const currentSport = { ...(perSport[selectedSport] ?? {}) } as Record<GoalMetric, number>;
 
     if (typeof value === "number") {
       currentSport[metric] = value;
@@ -146,7 +142,7 @@ export default function GoalsPage() {
       delete currentSport[metric];
     }
 
-    perSport[sportKey] = currentSport;
+    perSport[selectedSport] = currentSport;
 
     const payload: YearGoals = {
       ...base,
@@ -164,13 +160,13 @@ export default function GoalsPage() {
 
     setGoalOverridesBySport((prev) => {
       const next = { ...prev };
-      const sportOverrides = { ...(next[sportKey] ?? {}) };
+      const sportOverrides = { ...(next[selectedSport] ?? {}) };
       if (typeof value === "number") {
         sportOverrides[metric] = value;
       } else {
         delete sportOverrides[metric];
       }
-      next[sportKey] = sportOverrides;
+      next[selectedSport] = sportOverrides;
       return next;
     });
   }
@@ -185,66 +181,83 @@ export default function GoalsPage() {
     if (pendingSaveRef.current) {
       await pendingSaveRef.current;
     }
-    navigate(`/?sport=${sportKey}`);
+    navigate("/");
   }
 
   const isLoading = goalsLoading || activitiesLoading;
 
-  if (!isValidSport) {
-    return (
-      <div className="container-page">
-        <div className="card card--primary" style={{ marginTop: "2rem" }}>
-          <div className="card__body">
-            <h2 style={{ color: "var(--text-muted)" }}>Invalid sport</h2>
-            <p style={{ marginTop: "1rem", marginBottom: "1rem" }}>
-              Sport <strong>{sportParam}</strong> is not valid. Valid sports: run, ride.
-            </p>
-            <button
-              onClick={() => navigate("/")}
-              style={{
-                padding: "0.75rem 1.5rem",
-                borderRadius: "0.5rem",
-                border: "1px solid var(--border)",
-                background: "var(--bg-secondary)",
-                cursor: "pointer",
-              }}
-            >
-              Back to dashboard
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="container-page" style={{ paddingBottom: "2rem" }}>
-      <button
-        onClick={handleBack}
-        className="nav-back"
-        aria-label="Back to dashboard"
+      {/* Sticky header */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          backgroundColor: "var(--bg)",
+          paddingBottom: "var(--space-3)",
+          marginBottom: "var(--space-4)",
+        }}
       >
-        <ArrowLeft size={18} />
-        Back
-      </button>
+        <button
+          onClick={handleBack}
+          className="nav-back"
+          aria-label="Back to dashboard"
+        >
+          <ArrowLeft size={18} />
+          Back
+        </button>
 
-      <h1 className="goals-title">
-        {sportLabel} Goals
-        <span className="goals-title__year">{year}</span>
-      </h1>
+        <h1 className="goals-title">
+          Goals
+          <span className="goals-title__year">{year}</span>
+        </h1>
+        <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+          Set and manage your yearly targets
+        </p>
 
-      {isLoading && (
-        <p style={{ marginTop: "1.5rem", color: "var(--text-muted)" }}>Loading...</p>
-      )}
+        {/* Sport tabs */}
+        <div className="history-tabs" style={{ marginTop: "var(--space-4)" }}>
+          <button
+            type="button"
+            className={`history-tab${selectedSport === "run" ? " history-tab--active" : ""}`}
+            onClick={() => setSelectedSport("run")}
+            aria-pressed={selectedSport === "run"}
+            style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "15px", padding: "8px 18px" }}
+          >
+            <span style={{ width: "18px", height: "18px", display: "flex" }}>
+              <RunningIcon />
+            </span>
+            <span>Running</span>
+          </button>
+          <button
+            type="button"
+            className={`history-tab${selectedSport === "ride" ? " history-tab--active" : ""}`}
+            onClick={() => setSelectedSport("ride")}
+            aria-pressed={selectedSport === "ride"}
+            style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "15px", padding: "8px 18px" }}
+          >
+            <span style={{ width: "18px", height: "18px", display: "flex" }}>
+              <CyclingIcon />
+            </span>
+            <span>Cycling</span>
+          </button>
+        </div>
+      </div>
 
+      {/* Central AI Coach */}
       {!isLoading && stats && (
         <GoalsCentralAiCoach
-          sport={sportKey}
+          sport={selectedSport}
           year={year}
           stats={stats}
           otherStats={otherStats || undefined}
           currentGoals={currentGoals}
         />
+      )}
+
+      {isLoading && (
+        <p style={{ marginTop: "1.5rem", color: "var(--text-muted)" }}>Loading...</p>
       )}
 
       {!isLoading && (

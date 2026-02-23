@@ -37,11 +37,12 @@ export async function fetchAnalyzeNarrativeViaProxy(args: {
 
 export async function fetchGoalCoachViaProxy(args: {
   input: unknown;
+  multiCategory?: boolean;
 }): Promise<unknown> {
   const res = await fetch("/.netlify/functions/goalCoach", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ input: args.input }),
+    body: JSON.stringify({ input: args.input, multiCategory: args.multiCategory }),
   });
 
   if (!res.ok) throw new Error(`Goal coach proxy error ${res.status}`);
