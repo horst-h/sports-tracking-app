@@ -15,6 +15,7 @@ import { useAnalyzeNarrative } from '../hooks/useAnalyzeNarrative';
 import type { AnalyzeFacts as LlmAnalyzeFacts } from '../domain/ai/contracts/analyzeNarrative';
 import RunningIcon from '../components/icons/RunningIcon';
 import CyclingIcon from '../components/icons/CyclingIcon';
+import GoalTrendChartDetail from '../components/chart/GoalTrendChartDetail';
 
 const VALID_SPORTS: Sport[] = ['run', 'ride'];
 const VALID_METRICS = ['distance', 'count', 'elevation'];
@@ -142,6 +143,18 @@ export default function AnalyzePage() {
 
     return stats;
   }, [activities, goals, year, sport]);
+
+  // Build aggregate for chart visualization
+  const aggregate = useMemo(() => {
+    if (!token || !activities || activities.length === 0) return null;
+
+    const asOfLocalIso = new Date().toISOString();
+    const stravaLike = activities.map(toStravaLike);
+    const normalized = normalizeActivities(stravaLike as any);
+    const agg = aggregateYear(normalized, year, sport, asOfLocalIso);
+
+    return agg;
+  }, [activities, year, sport, token]);
 
   // Derive facts
   const facts = useMemo(() => {
@@ -459,6 +472,23 @@ export default function AnalyzePage() {
           </div>
         </div>
       </div>
+
+      {/* Goal Trend Chart */}
+      {aggregate && uiStats && (
+        <div className="card card--primary" style={{ marginTop: '2rem' }}>
+          <div className="card__body">
+            <h2 style={{ marginBottom: '1rem', fontSize: '18px', fontWeight: '700' }}>
+              Year Progress
+            </h2>
+            <GoalTrendChartDetail
+              aggregate={aggregate}
+              yearlyGoal={uiStats.progress[metric === 'distance' ? 'distanceKm' : metric === 'count' ? 'count' : 'elevationM'].goal}
+              metric={metric as 'distance' | 'count' | 'elevation'}
+              year={year}
+            />
+          </div>
+        </div>
+      )}
 
       {/* DEBUG PANEL (dev mode only) */}
       {import.meta.env.DEV && aiDebug && (
