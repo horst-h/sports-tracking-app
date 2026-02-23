@@ -1,5 +1,4 @@
 import { useNavigate } from "react-router-dom";
-import { BarChart3 } from "lucide-react";
 import type { UiAthleteStats } from "../domain/metrics/uiStats";
 import type { Sport } from "../domain/metrics/types";
 import type { ForecastResult } from "../domain/metrics/forecast";
@@ -52,62 +51,49 @@ export default function YearlyDistanceGoalCard({ sport, stats, forecast }: Props
     ? getStatusStyles(status.status)
     : { pillClass: "bg-slate-100 text-slate-500 border-slate-200", barClass: "bg-slate-400" };
 
-  return (
-    <section className="card card--primary" aria-label="Yearly distance goal summary">
-      <header className="card__header card__header--with-forecast">
-        <div className="card__header-top">
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <span className="card__kicker">Yearly Distance Goal</span>
-            <div
-              style={{
-                marginTop: "0.25rem",
-                fontSize: "0.875rem",
-                fontWeight: 600,
-                color: "#4b5563",
-              }}
-            >
-              {typeof goal === "number" ? `${goal} km` : "—"}
-            </div>
-          </div>
+  const handleCardClick = () => {
+    navigate(`/analyze/${sport}/distance`);
+  };
 
-          <GoalStatusHeader
-            statusLabel={status.label}
-            status={status.status}
-            daysAhead={forecast?.daysAhead}
-          >
-            <div style={{ display: "flex", gap: "6px", flexWrap: "nowrap" }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/analyze/${sport}/distance`);
-                }}
-                aria-label="Analyze distance goal"
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleCardClick();
+    }
+  };
+
+  return (
+    <div
+      className="card-wrapper card-wrapper--clickable"
+      onClick={handleCardClick}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label="Open distance goal details and analysis"
+    >
+      <section className="card card--primary" aria-label="Yearly distance goal summary">
+        <header className="card__header card__header--with-forecast">
+          <div className="card__header-top">
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span className="card__kicker">Yearly Distance Goal</span>
+              <div
                 style={{
-                  padding: "6px",
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  color: "var(--text-muted)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "4px",
-                  transition: "color 0.2s, background 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--bg-secondary)";
-                  e.currentTarget.style.color = "var(--text)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = "var(--text-muted)";
+                  marginTop: "0.25rem",
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                  color: "#4b5563",
                 }}
               >
-                <BarChart3 size={18} />
-              </button>
+                {typeof goal === "number" ? `${goal} km` : "—"}
+              </div>
             </div>
-          </GoalStatusHeader>
-        </div>
+
+            <GoalStatusHeader
+              statusLabel={status.label}
+              status={status.status}
+              daysAhead={forecast?.daysAhead}
+            />
+          </div>
 
         {forecast && (
           <div className="card__forecast-header">
@@ -141,7 +127,10 @@ export default function YearlyDistanceGoalCard({ sport, stats, forecast }: Props
             <div>No goal set - set a goal to see forecast and on/off-track status.</div>
             <button
               type="button"
-              onClick={() => navigate(`/goals/${sport}`)}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/goals/${sport}`);
+              }}
               aria-label="Set distance goal"
               style={{
                 marginTop: "0.5rem",
@@ -201,5 +190,6 @@ export default function YearlyDistanceGoalCard({ sport, stats, forecast }: Props
         )}
       </div>
     </section>
+    </div>
   );
 }
