@@ -159,12 +159,11 @@ body {
   font-size: 14px;
 }
 
-.app-logo-placeholder {
+.app-logo {
   flex-shrink: 0;
-  width: 60px;
+  width: 44px;
   height: 44px;
-  background: rgba(0, 0, 0, 0.06);
-  border: 1px solid var(--border);
+  object-fit: contain;
   border-radius: var(--radius-md);
 }
 

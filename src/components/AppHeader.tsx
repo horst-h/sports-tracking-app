@@ -18,14 +18,9 @@ export default function AppHeader({
   return (
     <header className="app-header" role="banner">
       <div className="app-header__inner">
-        <div className="app-logo-placeholder"></div>
+        <img src="/icons/icon-192.png" alt="Sports Tracking App" className="app-logo" />
         <div className="app-brand" aria-label="App header">
           <div className="app-brand__title-wrapper">
-            <div className="app-brand__dots">
-              <span className="dot dot--1"></span>
-              <span className="dot dot--2"></span>
-              <span className="dot dot--3"></span>
-            </div>
             <span className="app-brand__title">{title}</span>
           </div>
           <time className="app-brand__date" dateTime={dateTimeIso} aria-label="Current date">
