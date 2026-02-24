@@ -76,28 +76,28 @@ export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
       aria-label="Open units goal details and analysis"
     >
       <section className="card card--primary" aria-label="Yearly units goal summary">
-        <header className="card__header card__header--with-forecast">
-          <div className="card__header-top">
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <span className="card__kicker">Yearly Units Goal</span>
-              <div
-                style={{
-                  marginTop: "0.25rem",
-                  fontSize: "0.875rem",
-                  fontWeight: 600,
-                  color: "#4b5563",
-                }}
-              >
-                {typeof goal === "number" ? `${goal} ${unitLabel(sport)}` : "—"}
-              </div>
+      <header className="card__header card__header--with-forecast">
+        <div className="card__header-top">
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span className="card__kicker">Yearly Units Goal</span>
+            <div
+              style={{
+                marginTop: "0.25rem",
+                fontSize: "0.875rem",
+                fontWeight: 600,
+                color: "#4b5563",
+              }}
+            >
+              {typeof goal === "number" ? `${goal} ${unitLabel(sport)}` : "—"}
             </div>
-
-            <GoalStatusHeader
-              statusLabel={status.label}
-              status={status.status}
-              daysAhead={forecast?.daysAhead}
-            />
           </div>
+
+          <GoalStatusHeader
+            statusLabel={status.label}
+            status={status.status}
+            daysAhead={forecast?.daysAhead}
+          />
+        </div>
 
         {forecast && (
           <div className="card__forecast-header">
@@ -111,7 +111,7 @@ export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
                   {forecast.daysAhead < 0 ? "Required pace" : "Trend"}
                 </span>
                 <span className="forecast-value">
-                  {(forecast.daysAhead < 0 ? forecast.requiredPerWeek : forecast.trendPerWeek).toFixed(1)} {unitLabel(sport)}/week
+                  {(forecast.daysAhead < 0 ? forecast.requiredPerWeek : forecast.trendPerWeek).toFixed(1)} {unitLabel(sport)}/ week
                 </span>
               </div>
             </div>
@@ -125,10 +125,7 @@ export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
             <div>No goal set - set a goal to see forecast and on/off-track status.</div>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/goals/${sport}`);
-              }}
+              onClick={() => navigate(`/goals/${sport}`)}
               aria-label="Set units goal"
               style={{
                 marginTop: "0.5rem",

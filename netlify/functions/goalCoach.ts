@@ -176,7 +176,7 @@ function buildMultiCategoryPrompt(input: MultiCategoryCoachInput): { system: str
     return `  ${label}:
     ${goalStatus}
     YTD: ${data.ytd} ${unit}
-    Trend: ${data.trendPerWeek} ${unit}/week
+    Trend: ${data.trendPerWeek} ${unit}/ week
     Forecast: ${data.yearEndForecast} ${unit}`;
   }).join("\n\n");
 

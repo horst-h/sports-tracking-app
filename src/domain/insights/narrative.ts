@@ -21,7 +21,17 @@ export type NarrativeResult = {
 function getMetricLabel(metric: string, plural = false): string {
   const labels: Record<string, [string, string]> = {
     distance: ["km", "km"],
-    count: ["Activity", "Activities"],
+    count: ["", ""],
+    elevation: ["m", "m"],
+  };
+  const [sing, plur] = labels[metric] || ["", ""];
+  return plural ? plur : sing;
+}
+
+function getMetricLabelForParagraph(metric: string, plural = false): string {
+  const labels: Record<string, [string, string]> = {
+    distance: ["km", "km"],
+    count: ["activity", "activities"],
     elevation: ["m", "m"],
   };
   const [sing, plur] = labels[metric] || ["", ""];
@@ -46,7 +56,8 @@ export function buildNarrative(
 ): NarrativeResult {
   const sportLabel = getSportLabel(sport);
   const metricLabel = getMetricLabel(metric);
-  const title = `${sportLabel} · ${metricLabel}`;
+  const metricLabelForParagraph = getMetricLabelForParagraph(metric);
+  const title = `${sportLabel} · ${metricLabel === "" ? "Activities" : metricLabel}`;
 
   const {
     ytd,
@@ -60,14 +71,14 @@ export function buildNarrative(
   } = facts;
 
   const bullets: Array<{ label: string; value: string }> = [
-    { label: "Already achieved", value: `${formatMetricNumber(ytd, metric)} ${metricLabel}` },
-    { label: "Goal", value: `${formatMetricNumber(goal, metric)} ${metricLabel}` },
-    { label: "Remaining", value: `${formatMetricNumber(remaining, metric)} ${metricLabel}` },
-    { label: "Required per week", value: `${formatMetricNumber(requiredPerWeek, metric)} ${metricLabel}` },
-    { label: "Current trend", value: `${formatMetricNumber(trendPerWeek, metric)} ${metricLabel}/week` },
+    { label: "Already achieved", value: `${formatMetricNumber(ytd, metric)} ${metricLabel}`.trim() },
+    { label: "Goal", value: `${formatMetricNumber(goal, metric)} ${metricLabel}`.trim() },
+    { label: "Remaining", value: `${formatMetricNumber(remaining, metric)} ${metricLabel}`.trim() },
+    { label: "Required per week", value: `${formatMetricNumber(requiredPerWeek, metric)} ${metricLabel}`.trim() },
+    { label: "Current trend", value: `${formatMetricNumber(trendPerWeek, metric)} ${metricLabel}/week`.trim() },
     {
       label: "Forecast for Dec 31",
-      value: `${formatMetricNumber(forecastEoy, metric)} ${metricLabel}`,
+      value: `${formatMetricNumber(forecastEoy, metric)} ${metricLabel}`.trim(),
     },
   ];
 
@@ -78,26 +89,26 @@ export function buildNarrative(
   // Paragraph 1: Status
   let p1 = "";
   if (remaining <= 0) {
-    p1 = `Congratulations! You've already hit your goal of ${formatMetricNumber(goal, metric)} ${metricLabel}. `;
+    p1 = `Congratulations! You've already hit your goal of ${formatMetricNumber(goal, metric)} ${metricLabelForParagraph}. `;
     p1 += `Your current trend suggests you're still having fun with ${getSportLabel(sport).toLowerCase()}. `;
     p1 += `How's the body holding up? 😄`;
   } else if (requiredPerWeek <= trendPerWeek * 1.1) {
     // Small tolerance: if required is only 10% below trend
     p1 = `You're on track! 🎯 `;
-    p1 += `At your current pace of ø ${formatMetricNumber(trendPerWeek, metric)} ${metricLabel}/week, `;
+    p1 += `At your current pace of ø ${formatMetricNumber(trendPerWeek, metric)} ${metricLabelForParagraph}/week, `;
     p1 += `you'll hit your goal by year-end. `;
     p1 += `Keep it up – you're in good form.`;
   } else {
     p1 = `You're falling behind your plan. 📉 `;
-    p1 += `To reach your goal of ${formatMetricNumber(goal, metric)} ${metricLabel}, `;
-    p1 += `you need ø ${formatMetricNumber(requiredPerWeek, metric)} ${metricLabel}/week. `;
-    p1 += `Right now you're at ø ${formatMetricNumber(trendPerWeek, metric)} ${metricLabel}/week.`;
+    p1 += `To reach your goal of ${formatMetricNumber(goal, metric)} ${metricLabelForParagraph}, `;
+    p1 += `you need ø ${formatMetricNumber(requiredPerWeek, metric)} ${metricLabelForParagraph}/week. `;
+    p1 += `Right now you're at ø ${formatMetricNumber(trendPerWeek, metric)} ${metricLabelForParagraph}/week.`;
   }
 
   // Paragraph 2: Forecast & action
   let p2 = "";
   if (remaining <= 0) {
-    p2 = `At your current pace, you'd reach ${formatMetricNumber(forecastEoy, metric)} ${metricLabel} by year-end. `;
+    p2 = `At your current pace, you'd reach ${formatMetricNumber(forecastEoy, metric)} ${metricLabelForParagraph} by year-end. `;
     p2 += `That's well above your goal – great effort!`;
   } else {
     const weeksLeftStr = weeksLeft < 1 ? "less than a week" : `${Math.ceil(weeksLeft)} weeks`;
@@ -107,10 +118,10 @@ export function buildNarrative(
       p2 += `If you keep this pace, you'll be very close to your goal.`;
     } else if (forecastEoy < goal) {
       const shortfall = formatMetricNumber(goal - forecastEoy, metric);
-      p2 += `There's a risk you could fall ${shortfall} ${metricLabel} short. `;
+      p2 += `There's a risk you could fall ${shortfall} ${metricLabelForParagraph} short. `;
       p2 += `Pick up the pace if you can.`;
     } else {
-      p2 += `Your forecast: ${formatMetricNumber(forecastEoy, metric)} ${metricLabel} – just above the goal.`;
+      p2 += `Your forecast: ${formatMetricNumber(forecastEoy, metric)} ${metricLabelForParagraph} – just above the goal.`;
     }
   }
 

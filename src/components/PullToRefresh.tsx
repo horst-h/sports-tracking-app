@@ -56,8 +56,10 @@ export default function PullToRefresh({
         state,
       });
 
-      // In Chrome DevTools device mode, accept any pointer type for testing
-      // In production, you might want: if (e instanceof PointerEvent && e.pointerType === "mouse") return;
+      // Only handle touch events, ignore mouse events
+      if (e instanceof PointerEvent && e.pointerType === "mouse") {
+        return;
+      }
 
       // Must be at top of page
       if (window.scrollY !== 0) {
@@ -82,6 +84,11 @@ export default function PullToRefresh({
     }
 
     function handlePointerMove(e: PointerEvent | TouchEvent) {
+      // Only handle touch events, ignore mouse events
+      if (e instanceof PointerEvent && e.pointerType === "mouse") {
+        return;
+      }
+
       // Only track if we started from top
       if (scrollStartYRef.current !== 0) return;
 
@@ -94,8 +101,6 @@ export default function PullToRefresh({
         }
         return;
       }
-
-      // Accept any pointer type in dev mode (see handlePointerDown)
 
       const clientY =
         e instanceof TouchEvent
@@ -138,7 +143,7 @@ export default function PullToRefresh({
       }
     }
 
-    function handlePointerUp(e: PointerEvent | TouchEvent) {
+    function handlePointerUp(_e: PointerEvent | TouchEvent) {
       if (!isPullingRef.current) return;
 
       console.log("[PTR] Up:", { pullDistance, threshold: thresholdPx });
