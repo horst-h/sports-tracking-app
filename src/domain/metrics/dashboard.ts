@@ -46,7 +46,7 @@ export function buildDashboardModel(params: {
   const { normalized, year, goals, asOfDateLocal } = params;
   const generatedAtLocal = asOfDateLocal;
 
-  const sports: Sport[] = ["run", "ride"];
+  const sports: Sport[] = ["run", "ride", "swim"];
   const result: DashboardModel["sports"] = {} as any;
 
   for (const sport of sports) {

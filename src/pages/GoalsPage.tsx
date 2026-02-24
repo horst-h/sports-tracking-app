@@ -12,7 +12,7 @@ import { buildUiAthleteStats, type UiAthleteStats } from "../domain/metrics/uiSt
 import GoalField from "../components/GoalField";
 import GoalsCentralAiCoach from "../components/GoalsCentralAiCoach";
 
-const VALID_SPORTS: Sport[] = ["run", "ride"];
+const VALID_SPORTS: Sport[] = ["run", "ride", "swim"];
 
 const GOAL_FIELDS: Array<{
   key: GoalMetric;
@@ -20,6 +20,7 @@ const GOAL_FIELDS: Array<{
   unit: string;
   helpText?: string;
   allowDecimal: boolean;
+  excludeSports?: Sport[]; // Sports for which this metric is not applicable
 }> = [
   {
     key: "distanceKm",
@@ -41,11 +42,12 @@ const GOAL_FIELDS: Array<{
     unit: "m",
     helpText: "Total meters of elevation gain for the year",
     allowDecimal: true,
+    excludeSports: ["swim"], // Elevation is not tracked for swimming
   },
 ];
 
 function emptyGoals(year: number): YearGoals {
-  return { year, perSport: { run: {}, ride: {} } };
+  return { year, perSport: { run: {}, ride: {}, swim: {} } };
 }
 
 function toStravaLike(a: unknown): StravaActivityLike | null {
@@ -61,13 +63,13 @@ function toStravaLike(a: unknown): StravaActivityLike | null {
   }
 
   if (
-    (record.sport === "run" || record.sport === "ride") &&
+    (record.sport === "run" || record.sport === "ride" || record.sport === "swim") &&
     typeof record.startDate === "string" &&
     typeof record.distanceKm === "number"
   ) {
     return {
       id: record.id as string | number,
-      type: record.sport === "run" ? "Run" : "Ride",
+      type: record.sport === "run" ? "Run" : record.sport === "ride" ? "Ride" : "Swim",
       start_date_local: record.startDate,
       distance: record.distanceKm * 1000,
       total_elevation_gain: Number(record.elevationM ?? 0),
@@ -92,7 +94,7 @@ export default function GoalsPage() {
   const pendingSaveRef = useRef<Promise<void> | null>(null);
   const [goalOverridesBySport, setGoalOverridesBySport] = useState<
     Record<Sport, Partial<Record<GoalMetric, number | undefined>>>
-  >({ run: {}, ride: {} });
+  >({ run: {}, ride: {}, swim: {} });
 
   const currentGoals = useMemo<Partial<Record<GoalMetric, number>>>(() => {
     if (!isValidSport || !goals) return {};
@@ -126,11 +128,12 @@ export default function GoalsPage() {
     return {
       run: buildForSport("run"),
       ride: buildForSport("ride"),
+      swim: buildForSport("swim"),
     };
   }, [activities, goals, isValidSport, year, token]);
 
   const sportKey: Sport = isValidSport ? sport : "run";
-  const sportLabel = sportKey === "run" ? "Running" : "Cycling";
+  const sportLabel = sportKey === "run" ? "Running" : sportKey === "ride" ? "Cycling" : "Swimming";
   const otherSport: Sport = sportKey === "run" ? "ride" : "run";
   const stats = statsBySport ? statsBySport[sportKey] : null;
   const otherStats = statsBySport ? statsBySport[otherSport] : null;
@@ -197,7 +200,7 @@ export default function GoalsPage() {
           <div className="card__body">
             <h2 style={{ color: "var(--text-muted)" }}>Invalid sport</h2>
             <p style={{ marginTop: "1rem", marginBottom: "1rem" }}>
-              Sport <strong>{sportParam}</strong> is not valid. Valid sports: run, ride.
+              Sport <strong>{sportParam}</strong> is not valid. Valid sports: run, ride, swim.
             </p>
             <button
               onClick={() => navigate("/")}
@@ -250,6 +253,11 @@ export default function GoalsPage() {
       {!isLoading && (
         <div className="goals-grid">
           {GOAL_FIELDS.map((field) => {
+            // Skip this field if it's excluded for the current sport
+            if (field.excludeSports?.includes(sportKey)) {
+              return null;
+            }
+
             const currentValue = currentGoals[field.key];
 
             return (

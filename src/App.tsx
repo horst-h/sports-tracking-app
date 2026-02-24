@@ -46,13 +46,13 @@ function toStravaLike(a: any) {
 
   // domain-like (your cached activities)
   if (
-    (a.sport === "run" || a.sport === "ride") &&
+    (a.sport === "run" || a.sport === "ride" || a.sport === "swim") &&
     typeof a.startDate === "string" &&
     typeof a.distanceKm === "number"
   ) {
     return {
       id: a.id,
-      type: a.sport === "run" ? "Run" : "Ride",
+      type: a.sport === "run" ? "Run" : a.sport === "ride" ? "Ride" : "Swim",
       start_date_local: a.startDate,
       distance: a.distanceKm * 1000,
       total_elevation_gain: Number(a.elevationM ?? 0),
@@ -65,7 +65,7 @@ function toStravaLike(a: any) {
 }
 
 function emptyGoals(year: number): YearGoals {
-  return { year, perSport: { run: {}, ride: {} } };
+  return { year, perSport: { run: {}, ride: {}, swim: {} } };
 }
 
 // Build daily series from normalized activities per sport
@@ -138,10 +138,15 @@ export default function App() {
   // Restore sport from URL on mount
   useEffect(() => {
     const param = searchParams.get("sport");
-    if (param === "run" || param === "ride") {
+    // Migration: "hiking" → "swim" (or fallback to "run")
+    if (param === "run" || param === "ride" || param === "swim") {
       setSport(param);
+    } else if (param === "hiking") {
+      // Legacy migration: redirect hiking to swimming
+      setSport("swim");
+      setSearchParams({ sport: "swim" }, { replace: true });
     }
-  }, [searchParams]);
+  }, [searchParams, setSearchParams]);
 
   // Wrapper to update both state and URL when user clicks sport switcher
   function handleSportChange(newSport: Sport) {
@@ -236,6 +241,7 @@ export default function App() {
     return {
       run: buildForSport("run"),
       ride: buildForSport("ride"),
+      swim: buildForSport("swim"),
     };
   }, [activities, goals, year, mode, token]);
 
@@ -245,7 +251,7 @@ export default function App() {
   }
 
   const currentStats = dashboard
-    ? (sport === "run" ? dashboard.run : dashboard.ride)
+    ? (sport === "run" ? dashboard.run : sport === "ride" ? dashboard.ride : dashboard.swim)
     : null;
 
   async function handleForceLogout() {
@@ -306,11 +312,14 @@ export default function App() {
                   stats={currentStats}
                   forecast={currentStats.forecasts?.count}
                 />
-                <YearlyElevationGoalCard
-                  sport={sport}
-                  stats={currentStats}
-                  forecast={currentStats.forecasts?.elevationM}
-                />
+                {/* Elevation is not tracked for swimming */}
+                {sport !== "swim" && (
+                  <YearlyElevationGoalCard
+                    sport={sport}
+                    stats={currentStats}
+                    forecast={currentStats.forecasts?.elevationM}
+                  />
+                )}
               </>
             ) : (
               <p>No activities yet for {year}.</p>

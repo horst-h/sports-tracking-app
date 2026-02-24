@@ -13,6 +13,7 @@ import GoalField from "../components/GoalField";
 import GoalsCentralAiCoach from "../components/GoalsCentralAiCoach";
 import RunningIcon from "../components/icons/RunningIcon";
 import CyclingIcon from "../components/icons/CyclingIcon";
+import SwimmingIcon from "../components/icons/SwimmingIcon";
 
 const GOAL_FIELDS: Array<{
   key: GoalMetric;
@@ -20,6 +21,7 @@ const GOAL_FIELDS: Array<{
   unit: string;
   helpText?: string;
   allowDecimal: boolean;
+  excludeSports?: Sport[]; // Sports for which this metric is not applicable
 }> = [
   {
     key: "distanceKm",
@@ -41,11 +43,12 @@ const GOAL_FIELDS: Array<{
     unit: "m",
     helpText: "Total meters of elevation gain for the year",
     allowDecimal: true,
+    excludeSports: ["swim"], // Elevation is not tracked for swimming
   },
 ];
 
 function emptyGoals(year: number): YearGoals {
-  return { year, perSport: { run: {}, ride: {} } };
+  return { year, perSport: { run: {}, ride: {}, swim: {} } };
 }
 
 function toStravaLike(a: unknown): StravaActivityLike | null {
@@ -61,13 +64,13 @@ function toStravaLike(a: unknown): StravaActivityLike | null {
   }
 
   if (
-    (record.sport === "run" || record.sport === "ride") &&
+    (record.sport === "run" || record.sport === "ride" || record.sport === "swim") &&
     typeof record.startDate === "string" &&
     typeof record.distanceKm === "number"
   ) {
     return {
       id: record.id as string | number,
-      type: record.sport === "run" ? "Run" : "Ride",
+      type: record.sport === "run" ? "Run" : record.sport === "ride" ? "Ride" : "Swim",
       start_date_local: record.startDate,
       distance: record.distanceKm * 1000,
       total_elevation_gain: Number(record.elevationM ?? 0),
@@ -90,7 +93,7 @@ export default function GoalsScreen() {
   const pendingSaveRef = useRef<Promise<void> | null>(null);
   const [goalOverridesBySport, setGoalOverridesBySport] = useState<
     Record<Sport, Partial<Record<GoalMetric, number | undefined>>>
-  >({ run: {}, ride: {} });
+  >({ run: {}, ride: {}, swim: {} });
 
   const currentGoals = useMemo<Partial<Record<GoalMetric, number>>>(() => {
     if (!goals) return {};
@@ -124,6 +127,7 @@ export default function GoalsScreen() {
     return {
       run: buildForSport("run"),
       ride: buildForSport("ride"),
+      swim: buildForSport("swim"),
     };
   }, [activities, goals, year, token]);
 
@@ -242,6 +246,18 @@ export default function GoalsScreen() {
             </span>
             <span>Cycling</span>
           </button>
+          <button
+            type="button"
+            className={`history-tab${selectedSport === "swim" ? " history-tab--active" : ""}`}
+            onClick={() => setSelectedSport("swim")}
+            aria-pressed={selectedSport === "swim"}
+            style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "15px", padding: "8px 18px" }}
+          >
+            <span style={{ width: "18px", height: "18px", display: "flex" }}>
+              <SwimmingIcon />
+            </span>
+            <span>Swimming</span>
+          </button>
         </div>
       </div>
 
@@ -263,6 +279,11 @@ export default function GoalsScreen() {
       {!isLoading && (
         <div className="goals-grid">
           {GOAL_FIELDS.map((field) => {
+            // Skip this field if it's excluded for the current sport
+            if (field.excludeSports?.includes(selectedSport)) {
+              return null;
+            }
+
             const currentValue = currentGoals[field.key];
 
             return (

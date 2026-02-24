@@ -1,4 +1,5 @@
-export type Sport = "run" | "ride";
+// Swimming: Elevation is not tracked (always 0)
+export type Sport = "run" | "ride" | "swim";
 
 export interface StravaActivityLike {
   id: number | string;

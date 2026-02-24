@@ -36,18 +36,19 @@ function isFiniteNonNegNumber(x: unknown): x is number {
 }
 
 function normalizeYearGoals(year: number, input: YearGoals): YearGoals {
-  // Ensure year is consistent + ensure both sports exist
+  // Ensure year is consistent + ensure all sports exist
   const normalized: YearGoals = {
     ...input,
     year,
     perSport: {
       run: { ...(input.perSport?.run ?? {}) },
       ride: { ...(input.perSport?.ride ?? {}) },
+      swim: { ...(input.perSport?.swim ?? {}) },
     },
   };
 
   // Clean invalid metric values
-  const sports: Sport[] = ["run", "ride"];
+  const sports: Sport[] = ["run", "ride", "swim"];
   const metrics: GoalMetric[] = ["count", "distanceKm", "elevationM"];
 
   for (const s of sports) {
@@ -198,6 +199,7 @@ function remoteGoalsToYearGoals(year: number, goals: RemoteGoal[]): YearGoals {
     perSport: {
       run: {},
       ride: {},
+      swim: {},
     },
   };
 

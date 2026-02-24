@@ -19,13 +19,13 @@ function toStravaLike(a: any) {
 
   // Domain-like (your cached activities)
   if (
-    (a.sport === "run" || a.sport === "ride") &&
+    (a.sport === "run" || a.sport === "ride" || a.sport === "swim") &&
     typeof a.startDate === "string" &&
     typeof a.distanceKm === "number"
   ) {
     return {
       id: a.id,
-      type: a.sport === "run" ? "Run" : "Ride",
+      type: a.sport === "run" ? "Run" : a.sport === "ride" ? "Ride" : "Swim",
       start_date_local: a.startDate,
       distance: a.distanceKm * 1000, // meters
       total_elevation_gain: Number(a.elevationM ?? 0),

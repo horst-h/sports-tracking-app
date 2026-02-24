@@ -14,6 +14,7 @@ export function buildAiContext(args: {
   const time = getTimeContext(today);
 
   // 1) Map UiAthleteStats -> baseline sport snapshots (minimal + safe)
+  // Note: AI context currently only supports run/ride; swim support can be added later
   const baseSports = (["run", "ride"] as Sport[]).reduce((acc, sport) => {
     const s = args.ui[sport];
     if (!s) return acc; // Skip if no data for this sport

@@ -6,6 +6,8 @@ function mapSport(stravaType: string): SportType | null {
   const t = (stravaType || "").toLowerCase();
   if (t === "run") return "run";
   if (t === "ride") return "ride";
+  // Strava swim types: "swim", "openwaterswin" (typo in Strava API), etc.
+  if (t.includes("swim")) return "swim";
   return null;
 }
 

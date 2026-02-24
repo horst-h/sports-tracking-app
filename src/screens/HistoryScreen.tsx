@@ -44,13 +44,13 @@ function toStravaLike(a: unknown): StravaActivityLike | null {
   }
 
   if (
-    (record.sport === "run" || record.sport === "ride") &&
+    (record.sport === "run" || record.sport === "ride" || record.sport === "swim") &&
     typeof record.startDate === "string" &&
     typeof record.distanceKm === "number"
   ) {
     return {
       id: record.id as string | number,
-      type: record.sport === "run" ? "Run" : "Ride",
+      type: record.sport === "run" ? "Run" : record.sport === "ride" ? "Ride" : "Swim",
       start_date_local: record.startDate,
       distance: record.distanceKm * 1000,
       total_elevation_gain: Number(record.elevationM ?? 0),
@@ -92,7 +92,7 @@ function YearChips({
 }
 
 function SportSummaryCard({ summary }: { summary: SportSummary }) {
-  const label = summary.sport === "run" ? "Running" : "Cycling";
+  const label = summary.sport === "run" ? "Running" : summary.sport === "ride" ? "Cycling" : "Swimming";
 
   return (
     <div className="card card--primary">
@@ -113,12 +113,15 @@ function SportSummaryCard({ summary }: { summary: SportSummary }) {
             {formatNumber(summary.totals.distanceKm, { maximumFractionDigits: 1 })} km
           </div>
         </div>
-        <div className="history-summary__item">
-          <div className="history-summary__label">Elevation</div>
-          <div className="history-summary__value">
-            {formatNumber(summary.totals.elevationM)} m
+        {/* Elevation is not tracked for swimming */}
+        {summary.sport !== "swim" && (
+          <div className="history-summary__item">
+            <div className="history-summary__label">Elevation</div>
+            <div className="history-summary__value">
+              {formatNumber(summary.totals.elevationM)} m
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

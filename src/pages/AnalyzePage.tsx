@@ -17,7 +17,7 @@ import RunningIcon from '../components/icons/RunningIcon';
 import CyclingIcon from '../components/icons/CyclingIcon';
 import GoalTrendChartDetail from '../components/chart/GoalTrendChartDetail';
 
-const VALID_SPORTS: Sport[] = ['run', 'ride'];
+const VALID_SPORTS: Sport[] = ['run', 'ride']; // AI analysis currently only supports run/ride
 const VALID_METRICS = ['distance', 'count', 'elevation'];
 
 // Time context helpers
@@ -56,13 +56,13 @@ function toStravaLike(a: any) {
   }
 
   if (
-    (a.sport === 'run' || a.sport === 'ride') &&
+    (a.sport === 'run' || a.sport === 'ride' || a.sport === 'swim') &&
     typeof a.startDate === 'string' &&
     typeof a.distanceKm === 'number'
   ) {
     return {
       id: a.id,
-      type: a.sport === 'run' ? 'Run' : 'Ride',
+      type: a.sport === 'run' ? 'Run' : a.sport === 'ride' ? 'Ride' : 'Swim',
       start_date_local: a.startDate,
       distance: a.distanceKm * 1000,
       total_elevation_gain: Number(a.elevationM ?? 0),
@@ -158,12 +158,14 @@ export default function AnalyzePage() {
 
   // Derive facts
   const facts = useMemo(() => {
-    if (!uiStats || !goals) return null;
-    return deriveMetricFacts(sport, metric, uiStats, goals.perSport);
+    if (!uiStats || !goals || !sport || !metric) return null;
+    // Type assertion: sport is validated as "run" or "ride" by VALID_SPORTS check
+    return deriveMetricFacts(sport as "run" | "ride", metric, uiStats, goals.perSport);
   }, [uiStats, goals, sport, metric]);
 
   // Compute cross-sport stats for context (hoisted to avoid nested useMemo)
   const otherSportStats = useMemo(() => {
+    if (!sport) return null;
     const otherSport = sport === 'run' ? 'ride' : 'run';
     const otherSportGoals = goals?.perSport[otherSport];
     
@@ -184,7 +186,10 @@ export default function AnalyzePage() {
 
   // Map domain facts -> LLM facts
   const llmFacts: LlmAnalyzeFacts | null = useMemo(() => {
-    if (!facts) return null;
+    if (!facts || !sport || !metric) return null;
+
+    // Type assertion: sport is validated as "run" or "ride" by VALID_SPORTS check
+    const sportForAi = sport as "run" | "ride";
 
     // Compute time context
     const today = new Date();
@@ -194,7 +199,7 @@ export default function AnalyzePage() {
     const expectedProgressPercent = computeExpectedProgressPercent(dayOfYear, totalDaysInYear);
 
     // Compute cross-sport context
-    const otherSport = sport === 'run' ? 'ride' : 'run';
+    const otherSport = sportForAi === 'run' ? 'ride' : 'run';
     const otherSportGoals = goals?.perSport[otherSport];
 
     let otherSportContext: LlmAnalyzeFacts['otherSport'] | undefined;
@@ -224,7 +229,7 @@ export default function AnalyzePage() {
     }
 
     return {
-      sport,
+      sport: sportForAi,
       metric,
       already: facts.ytd,
       goal: facts.goal,

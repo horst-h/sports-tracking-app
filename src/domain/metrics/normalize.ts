@@ -4,6 +4,8 @@ function mapSport(type: string): Sport | null {
   const t = (type || "").toLowerCase();
   if (t === "run") return "run";
   if (t === "ride") return "ride";
+  // Strava swim types: "swim", "openwaterswin" (typo in Strava), etc.
+  if (t.includes("swim")) return "swim";
   return null; // ignore other sports for now
 }
 
@@ -41,7 +43,8 @@ export function normalizeActivities(
         month,
         dayOfYear: dayOfYear(start),
         distanceKm: (a.distance ?? 0) / 1000,
-        elevationM: a.total_elevation_gain ?? 0,
+        // Swimming: elevation is not tracked (always 0)
+        elevationM: sport === "swim" ? 0 : (a.total_elevation_gain ?? 0),
         movingTimeSec: a.moving_time ?? 0,
         isCommute,
         isIndoor: !!a.trainer,

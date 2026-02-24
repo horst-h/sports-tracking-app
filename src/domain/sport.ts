@@ -1,1 +1,1 @@
-export type SportType = "run" | "ride";
+export type SportType = "run" | "ride" | "swim";

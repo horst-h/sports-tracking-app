@@ -26,8 +26,15 @@ export default function GoalsCentralAiCoach({ sport, year, stats, otherStats, cu
   const [result, setResult] = useState<MultiCategoryCoachResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const otherSport = sport === "run" ? "ride" : "run";
-  const sportLabel = sport === "run" ? "running" : "cycling";
+  // AI Coach currently only supports run/ride
+  if (sport === "swim") {
+    return null;
+  }
+
+  // Type assertion: we've confirmed sport is "run" or "ride"
+  const sportForAi = sport as "run" | "ride";
+  const otherSport = sportForAi === "run" ? "ride" : "run";
+  const sportLabel = sportForAi === "run" ? "running" : "cycling";
 
   async function handleAnalyze() {
     setStatus("loading");
@@ -35,7 +42,7 @@ export default function GoalsCentralAiCoach({ sport, year, stats, otherStats, cu
 
     const input: MultiCategoryCoachInput = {
       year,
-      sport,
+      sport: sportForAi,
       remainingWeeks: stats.weeksLeftExact,
       categories: {
         distanceKm: {
