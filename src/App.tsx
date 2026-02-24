@@ -8,6 +8,7 @@ import YearlyCountGoalCard from "./components/YearlyCountGoalCard";
 import YearlyElevationGoalCard from "./components/YearlyElevationGoalCard";
 import BottomDrawer from "./components/BottomDrawer";
 import LoginCard from "./components/LoginCard";
+import PullToRefresh from "./components/PullToRefresh";
 
 import type { Sport, YearGoals, NormalizedActivity } from "./domain/metrics/types";
 import type { UiAthleteStats, ForecastMode } from "./domain/metrics/uiStats";
@@ -149,7 +150,7 @@ export default function App() {
   }
 
   // activities (MUST be before conditional return)
-  const { activities, loading, error } = useActivities(year, !!token);
+  const { activities, loading, error, refetch } = useActivities(year, !!token);
 
   // load goals whenever year changes OR drawer closes (after saving)
   useEffect(() => {
@@ -252,8 +253,12 @@ export default function App() {
     window.location.href = "/";
   }
 
+  async function handleRefresh() {
+    await refetch();
+  }
+
   return (
-    <>
+    <PullToRefresh onRefresh={handleRefresh} enabled={!!token}>
       {/* Sticky Header + Tab Navigation Container */}
       <div
         style={{
@@ -368,6 +373,6 @@ export default function App() {
           </div>
         </BottomDrawer>
       </main>
-    </>
+    </PullToRefresh>
   );
 }

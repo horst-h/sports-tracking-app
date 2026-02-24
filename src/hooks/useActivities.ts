@@ -45,16 +45,18 @@ export function useActivities(year: number, enabled: boolean, options?: UseActiv
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<"empty" | "cache" | "live">("empty");
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
 
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
     const allowLive = options?.allowLive ?? true;
+    const forceRefresh = refetchTrigger > 0;
 
     (async () => {
       // 1) Cache laden
       const cached = await loadYearActivities(year);
-      if (cached && !cancelled) {
+      if (cached && !cancelled && !forceRefresh) {
         setActivities(cached.activities);
         setSource("cache");
       }
@@ -73,10 +75,10 @@ export function useActivities(year: number, enabled: boolean, options?: UseActiv
       }
 
       // Beim ersten Mal ohne Cache: "loading", sonst "refreshing"
-      if (!cached) setLoading(true);
-      else if (isStale) setRefreshing(true);
+      if (!cached && !forceRefresh) setLoading(true);
+      else if (isStale || forceRefresh) setRefreshing(true);
 
-      if (!isStale) {
+      if (!isStale && !forceRefresh) {
         if (!cancelled) {
           setLoading(false);
           setRefreshing(false);
@@ -107,7 +109,11 @@ export function useActivities(year: number, enabled: boolean, options?: UseActiv
     return () => {
       cancelled = true;
     };
-  }, [year, enabled, options?.allowLive]);
+  }, [year, enabled, options?.allowLive, refetchTrigger]);
 
-  return { activities, loading, refreshing, error, source };
+  const refetch = async () => {
+    setRefetchTrigger((prev) => prev + 1);
+  };
+
+  return { activities, loading, refreshing, error, source, refetch };
 }
