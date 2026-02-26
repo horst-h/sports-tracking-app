@@ -26,56 +26,30 @@ export function useAuth() {
       if (!mounted) return;
       
       try {
-        // Check for token in localStorage first (from oauth-callback)
-        const storedPayload = localStorage.getItem('strava_oauth_token');
-        if (storedPayload) {
-          console.log("[useAuth] Found token in localStorage");
-          localStorage.removeItem('strava_oauth_token');
+        // Check for token in URL query parameter (most reliable)
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenParam = urlParams.get('token');
+        
+        if (tokenParam) {
+          console.log("[useAuth] Found token in query parameter");
           
           try {
-            const json = atob(storedPayload);
-            console.log("[useAuth] Decoded localStorage token");
+            const json = atob(tokenParam);
+            console.log("[useAuth] Decoded query param token");
             const decoded = JSON.parse(json);
             
             await saveToken(decoded);
             if (!mounted) return;
             setToken(decoded);
             setStatus("Logged in");
-            console.log("[useAuth] Token from localStorage saved");
-            return;
-          } catch (e) {
-            console.error("[useAuth] Error processing localStorage token:", e);
-          }
-        }
-        
-        // Check for token in URL hash (legacy support)
-        const hash = window.location.hash || "";
-        console.log("[useAuth] checkAuth called, hash:", hash);
-        const marker = "#token=";
-
-        if (hash.startsWith(marker)) {
-          try {
-            console.log("[useAuth] Token found in hash, decoding...");
-            const payload = hash.substring(marker.length);
-            console.log("[useAuth] Payload (first 50 chars):", payload.substring(0, 50));
+            console.log("[useAuth] Token from query param saved");
             
-            const decoded = decodeTokenPayload(payload);
-            console.log("[useAuth] Decoded token:", { access_token: decoded.access_token ? "present" : "missing", expires_at: decoded.expires_at });
-
-            await saveToken(decoded);
-            if (!mounted) return;
-            setToken(decoded);
-            setStatus("Logged in");
-            console.log("[useAuth] Token saved and state updated");
-
-            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-          } catch (e) {
-            console.error("[useAuth] Error processing token:", e);
-            if (!mounted) return;
-            setStatus("Error processing token");
+            // Remove token from URL
+            window.history.replaceState({}, document.title, window.location.pathname);
             return;
+          } catch (e) {
+            console.error("[useAuth] Error processing query param token:", e);
           }
-          return;
         }
 
         const existing = await loadToken();
@@ -96,52 +70,9 @@ export function useAuth() {
 
     // Call immediately on mount
     checkAuth();
-
-    // Listen for storage events (cross-tab communication)
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'strava_oauth_token' && e.newValue) {
-        console.log("[useAuth] storage event detected for oauth token");
-        checkAuth();
-      }
-    };
-    
-    // Listen for hash changes (OAuth redirect - legacy)
-    const handleHashChange = () => {
-      console.log("[useAuth] hashchange event detected");
-      checkAuth();
-    };
-    
-    // Listen for popstate (browser back/forward)
-    const handlePopState = () => {
-      console.log("[useAuth] popstate event detected");
-      checkAuth();
-    };
-    
-    // Polling fallback - check for token every 500ms for first 5 seconds
-    let pollCount = 0;
-    const pollInterval = setInterval(() => {
-      pollCount++;
-      if (pollCount > 10) {
-        clearInterval(pollInterval);
-        return;
-      }
-      if (localStorage.getItem('strava_oauth_token') || window.location.hash.startsWith("#token=")) {
-        console.log("[useAuth] Polling detected token");
-        checkAuth();
-        clearInterval(pollInterval);
-      }
-    }, 500);
-    
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("hashchange", handleHashChange);
-    window.addEventListener("popstate", handlePopState);
     
     return () => {
       mounted = false;
-      clearInterval(pollInterval);
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("hashchange", handleHashChange);
-      window.removeEventListener("popstate", handlePopState);
     };
   }, []);
 

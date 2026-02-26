@@ -56,7 +56,7 @@ export async function handler(event: any) {
     const tokenJson = (await tokenRes.json()) as StravaTokenResponse;
     console.log("[oauth-callback] Token received successfully");
 
-    // Prepare token payload
+    // Prepare token payload  
     const payload = btoa(
       JSON.stringify({
         access_token: tokenJson.access_token,
@@ -65,31 +65,17 @@ export async function handler(event: any) {
       })
     );
 
-    const redirectUrl = `${appBaseUrl}/`;
-    console.log("[oauth-callback] Returning HTML with localStorage + redirect");
+    // Use query parameter - simple and reliable
+    const redirectUrl = `${appBaseUrl}/?token=${encodeURIComponent(payload)}`;
+    console.log("[oauth-callback] Redirecting with 302 to app with token param");
 
-    // Use localStorage to pass token, then redirect
-    // This avoids hash issues with meta-refresh and server redirects
     return {
-      statusCode: 200,
+      statusCode: 302,
       headers: {
-        "content-type": "text/html; charset=utf-8",
         "cache-control": "no-store, no-cache, must-revalidate",
+        "location": redirectUrl,
       },
-      body: `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Redirecting...</title>
-</head>
-<body>
-  <p>Logging in...</p>
-  <script>
-    localStorage.setItem('strava_oauth_token', '${payload}');
-    window.location.replace('${redirectUrl}');
-  </script>
-</body>
-</html>`,
+      body: "",
     };
   } catch (e: any) {
     return json(500, { error: "unexpected_error", message: String(e?.message ?? e) });
