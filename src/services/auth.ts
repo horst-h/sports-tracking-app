@@ -1,12 +1,8 @@
 export async function startStravaLogin() {
   const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
-  const debugInfo = {
-    clientId,
-    allEnv: import.meta.env,
-    timestamp: new Date().toISOString(),
-  };
-  localStorage.setItem("DEBUG_LOGIN", JSON.stringify(debugInfo));
-  console.log("DEBUG: Saved to localStorage -", debugInfo);
+  
+  // DEBUG: Throw error to display env vars in browser
+  throw new Error(`DEBUG INFO - clientId: ${clientId}, all env keys: ${Object.keys(import.meta.env).join(", ")}`);
   
   if (!clientId) throw new Error("Missing VITE_STRAVA_CLIENT_ID");
 
