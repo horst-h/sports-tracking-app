@@ -1,5 +1,7 @@
 export async function startStravaLogin() {
   const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
+  console.log("DEBUG: VITE_STRAVA_CLIENT_ID =", clientId);
+  console.log("DEBUG: All env vars =", import.meta.env);
   if (!clientId) throw new Error("Missing VITE_STRAVA_CLIENT_ID");
 
   const redirectUri = `${window.location.origin}/.netlify/functions/oauth-callback`;
