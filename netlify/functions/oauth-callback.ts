@@ -69,15 +69,30 @@ export async function handler(event: any) {
     );
 
     const redirectUrl = `${appBaseUrl}/#token=${payload}`;
-    console.log("[oauth-callback] Returning 302 with location:", redirectUrl);
+    console.log("[oauth-callback] Returning HTML with JS redirect to:", redirectUrl);
 
+    // Return HTML that redirects via JavaScript instead of 302
+    // This ensures hashchange event fires and app can process the token
     return {
-      statusCode: 302,
+      statusCode: 200,
       headers: {
+        "content-type": "text/html",
         "cache-control": "no-store",
-        location: redirectUrl,
       },
-      body: "",
+      body: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Redirecting...</title>
+          </head>
+          <body>
+            <p>Logging in... redirecting...</p>
+            <script>
+              window.location.href = '${redirectUrl}';
+            </script>
+          </body>
+        </html>
+      `,
     };
   } catch (e: any) {
     return json(500, { error: "unexpected_error", message: String(e?.message ?? e) });
