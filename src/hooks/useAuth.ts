@@ -13,8 +13,14 @@ export function useAuth() {
       if (!mounted) return;
       
       try {
+        console.log("[useAuth] checkAuth called");
+        console.log("[useAuth] window.location.search:", window.location.search);
+        console.log("[useAuth] localStorage keys:", Object.keys(localStorage));
+        
         // Check for token in localStorage (from oauth-callback.html)
         const storedToken = localStorage.getItem('strava_oauth_token');
+        console.log("[useAuth] storedToken from localStorage:", storedToken ? "present" : "not found");
+        
         if (storedToken) {
           console.log("[useAuth] Found token in localStorage from callback");
           localStorage.removeItem('strava_oauth_token');
@@ -38,6 +44,7 @@ export function useAuth() {
         // Check for token in URL query parameter (direct method, fallback)
         const urlParams = new URLSearchParams(window.location.search);
         const tokenParam = urlParams.get('token');
+        console.log("[useAuth] tokenParam from query:", tokenParam ? "present" : "not found");
         
         if (tokenParam) {
           console.log("[useAuth] Found token in query parameter");
