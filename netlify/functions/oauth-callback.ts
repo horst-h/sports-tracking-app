@@ -69,30 +69,29 @@ export async function handler(event: any) {
     );
 
     const redirectUrl = `${appBaseUrl}/#token=${payload}`;
-    console.log("[oauth-callback] Returning HTML with JS redirect to:", redirectUrl);
+    const escapedUrl = redirectUrl.replace(/'/g, "\\'");
+    console.log("[oauth-callback] Returning HTML with redirect to:", redirectUrl);
 
-    // Return HTML that redirects via JavaScript instead of 302
-    // This ensures hashchange event fires and app can process the token
+    // Return HTML that redirects via meta refresh + JavaScript
+    // This ensures the redirect works even if JS is briefly blocked
     return {
       statusCode: 200,
       headers: {
-        "content-type": "text/html",
-        "cache-control": "no-store",
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store, no-cache, must-revalidate",
       },
-      body: `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Redirecting...</title>
-          </head>
-          <body>
-            <p>Logging in... redirecting...</p>
-            <script>
-              window.location.href = '${redirectUrl}';
-            </script>
-          </body>
-        </html>
-      `,
+      body: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="0;url=${redirectUrl}">
+  <title>Redirecting...</title>
+</head>
+<body>
+  <p>Logging in... redirecting...</p>
+  <script>window.location.replace('${escapedUrl}');</script>
+</body>
+</html>`,
     };
   } catch (e: any) {
     return json(500, { error: "unexpected_error", message: String(e?.message ?? e) });

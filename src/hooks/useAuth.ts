@@ -20,7 +20,11 @@ export function useAuth() {
   const [status, setStatus] = useState<string>("Checking auth...");
 
   useEffect(() => {
+    let mounted = true;
+    
     const checkAuth = async () => {
+      if (!mounted) return;
+      
       try {
         const hash = window.location.hash || "";
         console.log("[useAuth] checkAuth called, hash:", hash);
@@ -36,6 +40,7 @@ export function useAuth() {
             console.log("[useAuth] Decoded token:", { access_token: decoded.access_token ? "present" : "missing", expires_at: decoded.expires_at });
 
             await saveToken(decoded);
+            if (!mounted) return;
             setToken(decoded);
             setStatus("Logged in");
             console.log("[useAuth] Token saved and state updated");
@@ -43,6 +48,7 @@ export function useAuth() {
             window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           } catch (e) {
             console.error("[useAuth] Error processing token:", e);
+            if (!mounted) return;
             setStatus("Error processing token");
             return;
           }
@@ -51,6 +57,7 @@ export function useAuth() {
 
         const existing = await loadToken();
         console.log("[useAuth] Existing token in storage:", existing ? "found" : "not found");
+        if (!mounted) return;
         if (existing) {
           setToken(existing);
           setStatus("Logged in");
@@ -59,11 +66,12 @@ export function useAuth() {
         }
       } catch (e) {
         console.error("[useAuth] Unexpected error:", e);
+        if (!mounted) return;
         setStatus("Error checking auth");
       }
     };
 
-    // Call on mount
+    // Call immediately on mount
     checkAuth();
 
     // Listen for hash changes (OAuth redirect)
@@ -72,8 +80,37 @@ export function useAuth() {
       checkAuth();
     };
     
+    // Listen for popstate (browser back/forward)
+    const handlePopState = () => {
+      console.log("[useAuth] popstate event detected");
+      checkAuth();
+    };
+    
+    // Polling fallback - check hash every 500ms for first 5 seconds
+    // This handles cases where events don't fire (PWA, cached pages, etc.)
+    let pollCount = 0;
+    const pollInterval = setInterval(() => {
+      pollCount++;
+      if (pollCount > 10) {
+        clearInterval(pollInterval);
+        return;
+      }
+      if (window.location.hash.startsWith("#token=")) {
+        console.log("[useAuth] Polling detected token in hash");
+        checkAuth();
+        clearInterval(pollInterval);
+      }
+    }, 500);
+    
     window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", handlePopState);
+    
+    return () => {
+      mounted = false;
+      clearInterval(pollInterval);
+      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("popstate", handlePopState);
+    };
   }, []);
 
   return { token, status, setToken, setStatus };
