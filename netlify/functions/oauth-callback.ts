@@ -21,11 +21,15 @@ function json(statusCode: number, body: unknown) {
 export async function handler(event: any) {
   try {
     const code = event.queryStringParameters?.code;
+    console.log("[oauth-callback] Handler called, code present:", !!code);
+    
     if (!code) return json(400, { error: "missing_code" });
 
     const clientId = process.env.STRAVA_CLIENT_ID;
     const clientSecret = process.env.STRAVA_CLIENT_SECRET;
     const appBaseUrl = process.env.APP_BASE_URL;
+
+    console.log("[oauth-callback] Config loaded - appBaseUrl:", appBaseUrl);
 
     if (!clientId || !clientSecret || !appBaseUrl) {
       return json(500, { error: "missing_server_config" });
@@ -45,10 +49,12 @@ export async function handler(event: any) {
 
     if (!tokenRes.ok) {
       const text = await tokenRes.text();
+      console.error("[oauth-callback] Token exchange failed:", tokenRes.status, text);
       return json(502, { error: "token_exchange_failed", details: text });
     }
 
     const tokenJson = (await tokenRes.json()) as StravaTokenResponse;
+    console.log("[oauth-callback] Token received, redirecting to:", `${appBaseUrl}/#token=...`);
 
     // Redirect back to app with token payload in fragment (not sent to server logs)
     // NOTE: we DO NOT put tokens in query params.
@@ -62,11 +68,14 @@ export async function handler(event: any) {
       )
     );
 
+    const redirectUrl = `${appBaseUrl}/#token=${payload}`;
+    console.log("[oauth-callback] Returning 302 with location:", redirectUrl);
+
     return {
       statusCode: 302,
       headers: {
         "cache-control": "no-store",
-        location: `${appBaseUrl}/#token=${payload}`,
+        location: redirectUrl,
       },
       body: "",
     };
