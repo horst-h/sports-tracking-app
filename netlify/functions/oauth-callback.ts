@@ -65,9 +65,9 @@ export async function handler(event: any) {
       })
     );
 
-    // Use query parameter - simple and reliable
-    const redirectUrl = `${appBaseUrl}/?token=${encodeURIComponent(payload)}`;
-    console.log("[oauth-callback] Redirecting with 302 to app with token param");
+    // Redirect to static HTML page (not cached by service worker)
+    const redirectUrl = `${appBaseUrl}/oauth-callback.html?token=${encodeURIComponent(payload)}`;
+    console.log("[oauth-callback] Redirecting to callback page");
 
     return {
       statusCode: 302,

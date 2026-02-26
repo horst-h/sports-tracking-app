@@ -13,7 +13,29 @@ export function useAuth() {
       if (!mounted) return;
       
       try {
-        // Check for token in URL query parameter (most reliable)
+        // Check for token in localStorage (from oauth-callback.html)
+        const storedToken = localStorage.getItem('strava_oauth_token');
+        if (storedToken) {
+          console.log("[useAuth] Found token in localStorage from callback");
+          localStorage.removeItem('strava_oauth_token');
+          
+          try {
+            const json = atob(storedToken);
+            console.log("[useAuth] Decoded localStorage token");
+            const decoded = JSON.parse(json);
+            
+            await saveToken(decoded);
+            if (!mounted) return;
+            setToken(decoded);
+            setStatus("Logged in");
+            console.log("[useAuth] Token from localStorage saved");
+            return;
+          } catch (e) {
+            console.error("[useAuth] Error processing localStorage token:", e);
+          }
+        }
+        
+        // Check for token in URL query parameter (direct method, fallback)
         const urlParams = new URLSearchParams(window.location.search);
         const tokenParam = urlParams.get('token');
         
@@ -58,8 +80,16 @@ export function useAuth() {
     // Call immediately on mount
     checkAuth();
     
+    // Listen for storage events (from oauth-callback.html in same tab)
+    const handleStorage = () => {
+      console.log("[useAuth] storage event detected");
+      checkAuth();
+    };
+    window.addEventListener("storage", handleStorage);
+    
     return () => {
       mounted = false;
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
