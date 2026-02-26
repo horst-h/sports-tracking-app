@@ -12,7 +12,7 @@ export function useAuth() {
   const [status, setStatus] = useState<string>("Checking auth...");
 
   useEffect(() => {
-    (async () => {
+    const checkAuth = async () => {
       const hash = window.location.hash || "";
       const marker = "#token=";
 
@@ -35,7 +35,13 @@ export function useAuth() {
       } else {
         setStatus("Not logged in");
       }
-    })();
+    };
+
+    checkAuth();
+
+    // Listen for hash changes (OAuth redirect)
+    window.addEventListener("hashchange", checkAuth);
+    return () => window.removeEventListener("hashchange", checkAuth);
   }, []);
 
   return { token, status, setToken, setStatus };
