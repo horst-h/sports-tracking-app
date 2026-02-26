@@ -18,6 +18,12 @@
   targetPort = 5173
   port = 8888
 
+# OAuth callback - must be before SPA catch-all
+[[redirects]]
+  from = "/oauth-callback.html"
+  to = "/oauth-callback.html"
+  status = 200
+
 # Vite special paths - must exclude from SPA catch-all
 [[redirects]]
   from = "/@*"
