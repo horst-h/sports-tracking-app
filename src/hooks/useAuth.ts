@@ -3,8 +3,16 @@ import type { TokenData } from "../repositories/tokenRepository";
 import { loadToken, saveToken } from "../repositories/tokenRepository";
 
 function decodeTokenPayload(payload: string): TokenData {
-  const json = atob(decodeURIComponent(payload));
-  return JSON.parse(json);
+  try {
+    const json = atob(decodeURIComponent(payload));
+    console.log("[decodeTokenPayload] Decoded JSON (first 100 chars):", json.substring(0, 100));
+    const parsed = JSON.parse(json);
+    console.log("[decodeTokenPayload] Parsed successfully");
+    return parsed;
+  } catch (e) {
+    console.error("[decodeTokenPayload] Failed to decode:", e);
+    throw e;
+  }
 }
 
 export function useAuth() {
