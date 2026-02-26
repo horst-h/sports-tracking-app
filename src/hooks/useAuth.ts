@@ -2,19 +2,6 @@ import { useEffect, useState } from "react";
 import type { TokenData } from "../repositories/tokenRepository";
 import { loadToken, saveToken } from "../repositories/tokenRepository";
 
-function decodeTokenPayload(payload: string): TokenData {
-  try {
-    const json = atob(decodeURIComponent(payload));
-    console.log("[decodeTokenPayload] Decoded JSON (first 100 chars):", json.substring(0, 100));
-    const parsed = JSON.parse(json);
-    console.log("[decodeTokenPayload] Parsed successfully");
-    return parsed;
-  } catch (e) {
-    console.error("[decodeTokenPayload] Failed to decode:", e);
-    throw e;
-  }
-}
-
 export function useAuth() {
   const [token, setToken] = useState<TokenData | null>(null);
   const [status, setStatus] = useState<string>("Checking auth...");
