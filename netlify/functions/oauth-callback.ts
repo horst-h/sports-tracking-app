@@ -54,26 +54,22 @@ export async function handler(event: any) {
     }
 
     const tokenJson = (await tokenRes.json()) as StravaTokenResponse;
-    console.log("[oauth-callback] Token received, redirecting to:", `${appBaseUrl}/#token=...`);
+    console.log("[oauth-callback] Token received successfully");
 
-    // Redirect back to app with token payload in fragment (not sent to server logs)
-    // NOTE: we DO NOT put tokens in query params.
-    const payload = encodeURIComponent(
-      btoa(
-        JSON.stringify({
-          access_token: tokenJson.access_token,
-          refresh_token: tokenJson.refresh_token,
-          expires_at: tokenJson.expires_at,
-        })
-      )
+    // Prepare token payload
+    const payload = btoa(
+      JSON.stringify({
+        access_token: tokenJson.access_token,
+        refresh_token: tokenJson.refresh_token,
+        expires_at: tokenJson.expires_at,
+      })
     );
 
-    const redirectUrl = `${appBaseUrl}/#token=${payload}`;
-    const escapedUrl = redirectUrl.replace(/'/g, "\\'");
-    console.log("[oauth-callback] Returning HTML with redirect to:", redirectUrl);
+    const redirectUrl = `${appBaseUrl}/`;
+    console.log("[oauth-callback] Returning HTML with localStorage + redirect");
 
-    // Return HTML that redirects via meta refresh + JavaScript
-    // This ensures the redirect works even if JS is briefly blocked
+    // Use localStorage to pass token, then redirect
+    // This avoids hash issues with meta-refresh and server redirects
     return {
       statusCode: 200,
       headers: {
@@ -84,12 +80,14 @@ export async function handler(event: any) {
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0;url=${redirectUrl}">
   <title>Redirecting...</title>
 </head>
 <body>
-  <p>Logging in... redirecting...</p>
-  <script>window.location.replace('${escapedUrl}');</script>
+  <p>Logging in...</p>
+  <script>
+    localStorage.setItem('strava_oauth_token', '${payload}');
+    window.location.replace('${redirectUrl}');
+  </script>
 </body>
 </html>`,
     };

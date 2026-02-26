@@ -26,6 +26,29 @@ export function useAuth() {
       if (!mounted) return;
       
       try {
+        // Check for token in localStorage first (from oauth-callback)
+        const storedPayload = localStorage.getItem('strava_oauth_token');
+        if (storedPayload) {
+          console.log("[useAuth] Found token in localStorage");
+          localStorage.removeItem('strava_oauth_token');
+          
+          try {
+            const json = atob(storedPayload);
+            console.log("[useAuth] Decoded localStorage token");
+            const decoded = JSON.parse(json);
+            
+            await saveToken(decoded);
+            if (!mounted) return;
+            setToken(decoded);
+            setStatus("Logged in");
+            console.log("[useAuth] Token from localStorage saved");
+            return;
+          } catch (e) {
+            console.error("[useAuth] Error processing localStorage token:", e);
+          }
+        }
+        
+        // Check for token in URL hash (legacy support)
         const hash = window.location.hash || "";
         console.log("[useAuth] checkAuth called, hash:", hash);
         const marker = "#token=";
@@ -74,7 +97,15 @@ export function useAuth() {
     // Call immediately on mount
     checkAuth();
 
-    // Listen for hash changes (OAuth redirect)
+    // Listen for storage events (cross-tab communication)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'strava_oauth_token' && e.newValue) {
+        console.log("[useAuth] storage event detected for oauth token");
+        checkAuth();
+      }
+    };
+    
+    // Listen for hash changes (OAuth redirect - legacy)
     const handleHashChange = () => {
       console.log("[useAuth] hashchange event detected");
       checkAuth();
@@ -86,8 +117,7 @@ export function useAuth() {
       checkAuth();
     };
     
-    // Polling fallback - check hash every 500ms for first 5 seconds
-    // This handles cases where events don't fire (PWA, cached pages, etc.)
+    // Polling fallback - check for token every 500ms for first 5 seconds
     let pollCount = 0;
     const pollInterval = setInterval(() => {
       pollCount++;
@@ -95,19 +125,21 @@ export function useAuth() {
         clearInterval(pollInterval);
         return;
       }
-      if (window.location.hash.startsWith("#token=")) {
-        console.log("[useAuth] Polling detected token in hash");
+      if (localStorage.getItem('strava_oauth_token') || window.location.hash.startsWith("#token=")) {
+        console.log("[useAuth] Polling detected token");
         checkAuth();
         clearInterval(pollInterval);
       }
     }, 500);
     
+    window.addEventListener("storage", handleStorage);
     window.addEventListener("hashchange", handleHashChange);
     window.addEventListener("popstate", handlePopState);
     
     return () => {
       mounted = false;
       clearInterval(pollInterval);
+      window.removeEventListener("storage", handleStorage);
       window.removeEventListener("hashchange", handleHashChange);
       window.removeEventListener("popstate", handlePopState);
     };
