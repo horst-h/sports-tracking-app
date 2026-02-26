@@ -2,9 +2,9 @@ export async function startStravaLogin() {
   const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
   if (!clientId) throw new Error("Missing VITE_STRAVA_CLIENT_ID");
 
-  const redirectUri = `${window.location.origin}/.netlify/functions/oauth-callback`;
+  const redirectUri = `${window.location.origin}/`;
 
-  const scope = "read,activity:read_all"; // later: reduce if possible
+  const scope = "read,activity:read_all";
 
   const authUrl =
     "https://www.strava.com/oauth/authorize?" +
