@@ -63,7 +63,17 @@ export function useAuth() {
       }
     };
 
+    // Call on mount
     checkAuth();
+
+    // Listen for hash changes (OAuth redirect)
+    const handleHashChange = () => {
+      console.log("[useAuth] hashchange event detected");
+      checkAuth();
+    };
+    
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
   return { token, status, setToken, setStatus };
