@@ -92,11 +92,8 @@ export async function saveToken(token: StravaToken): Promise<void> {
     const db = await openSportsDB();
     const normalized = normalizeToken(token);
     if (!normalized) throw new Error("Invalid token payload");
-    console.log("[saveToken] Saving token to IndexedDB...");
     await db.put(STORE, wrapDoc(normalized), KEY);
-    console.log("[saveToken] Token saved successfully");
   } catch (e) {
-    console.error("[saveToken] Failed to save token:", e);
     throw e;
   }
 }
@@ -109,10 +106,8 @@ export async function loadToken(): Promise<StravaToken | null> {
     const db = await openSportsDB();
     const raw = await db.get(STORE, KEY);
     const result = unwrapDoc(raw);
-    console.log("[loadToken] Loaded from IndexedDB:", result ? "found" : "not found");
     return result;
   } catch (e) {
-    console.error("[loadToken] Failed to load token:", e);
     return null;
   }
 }

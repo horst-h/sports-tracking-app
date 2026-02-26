@@ -43,8 +43,6 @@ export async function handler(event: any) {
       return json(500, { error: "Server config error" });
     }
 
-    console.log("[exchange-code] Exchanging code for token...");
-
     // Exchange authorization code for token (Strava)
     const tokenRes = await fetch("https://www.strava.com/oauth/token", {
       method: "POST",
@@ -59,12 +57,10 @@ export async function handler(event: any) {
 
     if (!tokenRes.ok) {
       const text = await tokenRes.text();
-      console.error("[exchange-code] Token exchange failed:", tokenRes.status, text);
       return json(502, { error: "token_exchange_failed", details: text });
     }
 
     const tokenJson = (await tokenRes.json()) as StravaTokenResponse;
-    console.log("[exchange-code] Token received successfully");
 
     // Return token to browser
     return json(200, {
