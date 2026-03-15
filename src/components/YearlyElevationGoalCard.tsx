@@ -71,7 +71,7 @@ export default function YearlyElevationGoalCard({ sport, stats, forecast }: Prop
       tabIndex={0}
       aria-label="Open elevation goal details and analysis"
     >
-      <section className="card card--primary" aria-label="Yearly elevation goal summary">
+      <section className="card card--primary card--dashboard card--elevation" aria-label="Yearly elevation goal summary">
         <header className="card__header card__header--with-forecast">
           <div className="card__header-top">
             <div style={{ display: "flex", flexDirection: "column" }}>

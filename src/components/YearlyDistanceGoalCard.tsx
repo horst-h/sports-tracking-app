@@ -71,7 +71,7 @@ export default function YearlyDistanceGoalCard({ sport, stats, forecast }: Props
       tabIndex={0}
       aria-label="Open distance goal details and analysis"
     >
-      <section className="card card--primary" aria-label="Yearly distance goal summary">
+      <section className="card card--primary card--dashboard card--distance" aria-label="Yearly distance goal summary">
         <header className="card__header card__header--with-forecast">
           <div className="card__header-top">
             <div style={{ display: "flex", flexDirection: "column" }}>

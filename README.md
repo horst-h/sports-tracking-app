@@ -23,9 +23,18 @@ npm install
 # Dev Server starten
 npm run dev
 
+# Dev Server mit Netlify (Strava OAuth lokal, Port 8888)
+npm run dev:netlify
+
+oder 
+
+npx netlify dev
+
 # Build für Produktion
 npm run build
 ```
+
+Hinweis: Für den lokalen Strava-Login immer den Netlify-Dev-Server nutzen, da Redirects und Functions darüber laufen.
 
 ### Backend-Funktionen (Netlify Functions)
 

@@ -75,7 +75,7 @@ export default function YearlyCountGoalCard({ sport, stats, forecast }: Props) {
       tabIndex={0}
       aria-label="Open units goal details and analysis"
     >
-      <section className="card card--primary" aria-label="Yearly units goal summary">
+      <section className="card card--primary card--dashboard card--count" aria-label="Yearly units goal summary">
       <header className="card__header card__header--with-forecast">
         <div className="card__header-top">
           <div style={{ display: "flex", flexDirection: "column" }}>
