@@ -27,7 +27,6 @@ export function useAuth() {
             });
 
             if (!exchangeRes.ok) {
-              const error = await exchangeRes.json();
               if (mounted) setStatus("Login failed");
               return;
             }
