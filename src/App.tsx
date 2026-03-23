@@ -23,10 +23,6 @@ import { useAuth } from "./hooks/useAuth";
 import * as goalsRepo from "./repositories/goalsRepository";
 import { clearToken } from "./repositories/tokenRepository";
 
-function formatHeaderDate(d: Date) {
-  return d.toDateString();
-}
-
 // Type for stats with optional forecasts
 type StatsWithForecasts = UiAthleteStats & {
   forecasts?: {
@@ -119,8 +115,6 @@ function buildDailyActivityCountSeries(
 }
 
 export default function App() {
-  const today = new Date();
-
   const [sport, setSport] = useState<Sport>("run");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const year = new Date().getFullYear();
@@ -155,7 +149,7 @@ export default function App() {
   }
 
   // activities (MUST be before conditional return)
-  const { activities, loading, error, refetch } = useActivities(year, !!token);
+  const { activities, loading, refreshing, error, lastSync, refetch } = useActivities(year, !!token);
 
   // load goals whenever year changes OR drawer closes (after saving)
   useEffect(() => {
@@ -263,6 +257,9 @@ export default function App() {
     await refetch();
   }
 
+  // Determine sync status
+  const syncStatus = error ? 'error' : (loading || refreshing) ? 'syncing' : 'idle';
+
   return (
     <PullToRefresh onRefresh={handleRefresh} enabled={!!token}>
       {/* Sticky Header + Tab Navigation Container */}
@@ -281,8 +278,8 @@ export default function App() {
       >
         <AppHeader
           title="still moving"
-          dateLabel={formatHeaderDate(today)}
-          dateTimeIso={today.toISOString().slice(0, 10)}
+          syncStatus={syncStatus}
+          lastSync={lastSync}
           avatarText="HH"
           avatarImage={athlete?.profile_medium}
           onAvatarClick={() => setSettingsOpen(true)}

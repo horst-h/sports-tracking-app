@@ -1,7 +1,11 @@
+import DataStatus from './DataStatus';
+
+type SyncStatus = 'idle' | 'syncing' | 'error';
+
 type AppHeaderProps = {
   title: string;
-  dateLabel: string;      // "Saturday, Feb 7, 2026"
-  dateTimeIso: string;    // "2026-02-07"
+  syncStatus: SyncStatus;
+  lastSync?: Date;
   avatarText: string;     // "RV"
   avatarImage?: string;   // URL to profile image (optional)
   onAvatarClick?: () => void;
@@ -9,8 +13,8 @@ type AppHeaderProps = {
 
 export default function AppHeader({
   title,
-  dateLabel,
-  dateTimeIso,
+  syncStatus,
+  lastSync,
   avatarText,
   avatarImage,
   onAvatarClick,
@@ -23,9 +27,7 @@ export default function AppHeader({
           <div className="app-brand__title-wrapper">
             <span className="app-brand__title">{title}</span>
           </div>
-          <time className="app-brand__date" dateTime={dateTimeIso} aria-label="Current date">
-            {dateLabel}
-          </time>
+          <DataStatus status={syncStatus} lastSync={lastSync} />
         </div>
 
         <button className="avatar" type="button" aria-label="Open profile" onClick={onAvatarClick}>

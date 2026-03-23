@@ -45,6 +45,7 @@ export function useActivities(year: number, enabled: boolean, options?: UseActiv
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<"empty" | "cache" | "live">("empty");
+  const [lastSync, setLastSync] = useState<Date | undefined>(undefined);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
 
   useEffect(() => {
@@ -58,6 +59,7 @@ export function useActivities(year: number, enabled: boolean, options?: UseActiv
       const cached = await loadYearActivities(year);
       if (cached && !cancelled && !forceRefresh) {
         setActivities(cached.activities);
+        setLastSync(new Date(cached.fetchedAt));
         setSource("cache");
       }
 
@@ -94,6 +96,7 @@ export function useActivities(year: number, enabled: boolean, options?: UseActiv
 
         if (!cancelled) {
           setActivities(all);
+          setLastSync(new Date());
           setSource("live");
         }
       } catch (e: any) {
@@ -115,5 +118,5 @@ export function useActivities(year: number, enabled: boolean, options?: UseActiv
     setRefetchTrigger((prev) => prev + 1);
   };
 
-  return { activities, loading, refreshing, error, source, refetch };
+  return { activities, loading, refreshing, error, source, lastSync, refetch };
 }
