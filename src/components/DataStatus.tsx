@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 type SyncStatus = 'idle' | 'syncing' | 'error';
 
 interface DataStatusProps {
@@ -5,8 +7,7 @@ interface DataStatusProps {
   lastSync?: Date;
 }
 
-function formatLastSync(date: Date): string {
-  const now = new Date();
+function formatLastSync(date: Date, now: Date = new Date()): string {
   const diffMs = now.getTime() - date.getTime();
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -46,6 +47,20 @@ function StravaIcon() {
 }
 
 export default function DataStatus({ status, lastSync }: DataStatusProps) {
+  const [tick, setTick] = useState(Date.now());
+
+  useEffect(() => {
+    if (status !== 'idle' || !lastSync) return;
+
+    const interval = setInterval(() => {
+      setTick(Date.now());
+    }, 60_000);
+
+    return () => clearInterval(interval);
+  }, [status, lastSync]);
+
+  const now = new Date(tick);
+
   const getStatusText = () => {
     const base = '\u00A0\u00A0data provided by Strava®';
 
@@ -57,7 +72,7 @@ export default function DataStatus({ status, lastSync }: DataStatusProps) {
       case 'idle':
       default:
         if (lastSync) {
-          return `${base} synced • ${formatLastSync(lastSync)}`;
+          return `${base} synced • ${formatLastSync(lastSync, now)}`;
         }
         return `${base} synced • not synced`;
     }

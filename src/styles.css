@@ -435,6 +435,10 @@ body {
   padding: var(--space-4) var(--space-5) var(--space-5);
 }
 
+.card--dashboard .card__body {
+  padding-top: 2px;
+}
+
 .card__body--tight {
   padding: var(--space-5);
 }
@@ -1208,15 +1212,15 @@ body {
 .card__header--with-forecast {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
-  padding: 14px;
+  gap: 2px;
+  padding: 8px 8px 6px;
 }
 
 .card__header-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .card__kicker {
@@ -1231,14 +1235,17 @@ body {
 .card__forecast-header {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
-  padding: 10px 0;
+  gap: 2px;
+  padding: 0;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
-  padding-top: 10px;
 }
 
 .card--dashboard .card__forecast-header {
   border-top: 1px solid rgba(15, 23, 42, 0.2);
+}
+
+.card--dashboard .card__body {
+  padding-top: 0;
 }
 
 .forecast-header-metrics {
