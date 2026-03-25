@@ -379,6 +379,18 @@ export default function App() {
           </div>
         </BottomDrawer>
       </main>
+
+      <footer style={{
+        textAlign: 'center',
+        padding: '1rem',
+        fontSize: '0.875rem',
+        color: 'var(--text-muted)',
+        borderTop: '1px solid var(--border)',
+        marginTop: '1rem'
+      }}>
+        <img src="/icons/strava-logo.svg" alt="Strava" style={{ height: '1rem', marginRight: '0.5rem' }} />
+        data provided by <a href="https://strava.com" style={{ color: 'var(--text-muted)', textDecoration: 'underline' }}>Strava®</a>
+      </footer>
     </PullToRefresh>
   );
 }

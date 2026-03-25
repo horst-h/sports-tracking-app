@@ -35,17 +35,6 @@ function formatLastSync(date: Date, now: Date = new Date()): string {
   }
 }
 
-function StravaIcon() {
-  return (
-    <img
-      src="/icons/strava-logo.svg"
-      alt="Strava"
-      className="inline-block h-4 w-4 object-contain"
-      style={{ maxWidth: '24px', maxHeight: '24px', verticalAlign: 'middle' }}
-    />
-  );
-}
-
 export default function DataStatus({ status, lastSync }: DataStatusProps) {
   const [tick, setTick] = useState(Date.now());
 
@@ -62,19 +51,17 @@ export default function DataStatus({ status, lastSync }: DataStatusProps) {
   const now = new Date(tick);
 
   const getStatusText = () => {
-    const base = '\u00A0\u00A0data provided by Strava®';
-
     switch (status) {
       case 'syncing':
-        return `${base} syncing…`;
+        return 'syncing…';
       case 'error':
-        return `${base} sync failed`;
+        return 'sync failed';
       case 'idle':
       default:
         if (lastSync) {
-          return `${base} synced • ${formatLastSync(lastSync, now)}`;
+          return `synced • ${formatLastSync(lastSync, now)}`;
         }
-        return `${base} synced • not synced`;
+        return 'synced • not synced';
     }
   };
 
@@ -92,7 +79,6 @@ export default function DataStatus({ status, lastSync }: DataStatusProps) {
 
   return (
     <div className="flex items-center gap-2 text-sm whitespace-nowrap">
-      <StravaIcon />
       <span className={getStatusColor()}>{getStatusText()}</span>
       {status === 'syncing' && (
         <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
