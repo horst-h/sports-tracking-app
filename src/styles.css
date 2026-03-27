@@ -17,6 +17,7 @@
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
   --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.04);
 
+  --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
@@ -816,7 +817,7 @@ body {
 }
 
 .metric__value {
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
   font-size: 32px;
   font-weight: 800;
   letter-spacing: -0.03em;
@@ -834,7 +835,7 @@ body {
 
 /* ----- Progress bar: gray track, green fill ----- */
 .progress {
-  margin-top: var(--space-5);
+  margin-top: var(--space-3);
 }
 
 .progress__bar {
@@ -853,7 +854,7 @@ body {
 }
 
 .progress__meta {
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1236,12 +1237,13 @@ body {
   display: grid;
   grid-template-columns: 1fr;
   gap: 2px;
-  padding: 0;
+  padding: 0.8rem 0 0 0;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .card--dashboard .card__forecast-header {
   border-top: 1px solid rgba(15, 23, 42, 0.2);
+  padding-top: 0.5rem;
 }
 
 .card--dashboard .card__body {
