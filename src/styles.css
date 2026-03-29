@@ -652,6 +652,43 @@ body {
   border-color: #111827;
 }
 
+/* ----- Sport filter chips (inside chart panel) ----- */
+.sport-filter-chips {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.sport-filter-chip {
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.04));
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sport-filter-chip:hover {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.sport-filter-chip--active {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sport-filter-chip {
+    transition: none;
+  }
+}
+
 .history-empty-title {
   margin: 0 0 8px;
 }

@@ -15,9 +15,12 @@ import {
 import type { HistoryMetric, MonthlySeriesItem } from "../../domain/metrics/monthly";
 import { formatNumber } from "../../utils/format";
 
+export type SportFilter = "all" | "run" | "ride";
+
 type Props = {
   metric: HistoryMetric;
   data: MonthlySeriesItem[];
+  sportFilter?: SportFilter;
 };
 
 function formatTick(metric: HistoryMetric, value: number): string {
@@ -42,7 +45,17 @@ function formatValue(metric: HistoryMetric, value: number): string {
   return `${formatNumber(rounded, { maximumFractionDigits: 0 })} ${unit}`;
 }
 
-function CustomTooltip({ active, payload, label, metric }: TooltipProps<number, string> & { metric: HistoryMetric }) {
+// Color palette (year-independent for single-year chart)
+const COLOR_RUN = "var(--accent-green)";   // green
+const COLOR_RIDE = "var(--status-over)";   // blue
+
+function CustomTooltip({
+  active,
+  payload,
+  label,
+  metric,
+  sportFilter = "all",
+}: TooltipProps<number, string> & { metric: HistoryMetric; sportFilter?: SportFilter }) {
   if (!active || !payload || payload.length === 0) return null;
 
   const row = payload[0]?.payload as MonthlySeriesItem | undefined;
@@ -64,15 +77,17 @@ function CustomTooltip({ active, payload, label, metric }: TooltipProps<number, 
       }}
     >
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
-        Total: <span style={{ color: "var(--text)" }}>{formatValue(metric, total)}</span>
-      </div>
-      {running > 0 && (
+      {sportFilter === "all" && (
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
+          Total: <span style={{ color: "var(--text)" }}>{formatValue(metric, total)}</span>
+        </div>
+      )}
+      {(sportFilter === "all" || sportFilter === "run") && running > 0 && (
         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
           Running: <span style={{ color: "var(--text)" }}>{formatValue(metric, running)}</span>
         </div>
       )}
-      {cycling > 0 && (
+      {(sportFilter === "all" || sportFilter === "ride") && cycling > 0 && (
         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
           Cycling: <span style={{ color: "var(--text)" }}>{formatValue(metric, cycling)}</span>
         </div>
@@ -81,6 +96,7 @@ function CustomTooltip({ active, payload, label, metric }: TooltipProps<number, 
   );
 }
 
+/** Running bar: flat bottom on stacked, rounded top only when it's the top segment. */
 function RunningBarShape(props: RectangleProps & { payload?: MonthlySeriesItem }) {
   const { payload, ...rest } = props;
   const hasCycling = (payload?.cycling ?? 0) > 0;
@@ -88,20 +104,26 @@ function RunningBarShape(props: RectangleProps & { payload?: MonthlySeriesItem }
   return <Rectangle {...rest} radius={radius} />;
 }
 
-export default function HistoryMonthlyChart({ metric, data }: Props) {
+export default function HistoryMonthlyChart({ metric, data, sportFilter = "all" }: Props) {
   const hasRunning = data.some((d) => d.running > 0);
   const hasCycling = data.some((d) => d.cycling > 0);
 
+  const showRunning = sportFilter === "all" ? hasRunning : sportFilter === "run" && hasRunning;
+  const showCycling = sportFilter === "all" ? hasCycling : sportFilter === "ride" && hasCycling;
+  const hasVisible = showRunning || showCycling;
+
   return (
     <>
-      {!hasRunning && !hasCycling && (
+      {!hasVisible && (
         <div className="text-muted" style={{ marginTop: 16 }}>
           No data for this year.
         </div>
       )}
 
-      {(hasRunning || hasCycling) && (
-        <div style={{ width: "100%", height: 220, marginTop: 8 }}>
+      {hasVisible && (
+        <div
+          style={{ width: "100%", height: 220, marginTop: 8, transition: "opacity 0.25s ease" }}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
@@ -122,7 +144,7 @@ export default function HistoryMonthlyChart({ metric, data }: Props) {
                 style={{ fontSize: 11, fill: "var(--text-muted)" }}
               />
               <Tooltip
-                content={<CustomTooltip metric={metric} />}
+                content={<CustomTooltip metric={metric} sportFilter={sportFilter} />}
                 cursor={{ fillOpacity: 0.06 }}
               />
               <Legend
@@ -134,22 +156,26 @@ export default function HistoryMonthlyChart({ metric, data }: Props) {
                   <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{value}</span>
                 )}
               />
-              {hasRunning && (
+              {showRunning && (
                 <Bar
                   dataKey="running"
                   stackId="a"
                   name="Running"
-                  fill="var(--accent-green)"
+                  fill={COLOR_RUN}
                   shape={<RunningBarShape />}
+                  isAnimationActive={true}
+                  animationDuration={300}
                 />
               )}
-              {hasCycling && (
+              {showCycling && (
                 <Bar
                   dataKey="cycling"
                   stackId="a"
                   name="Cycling"
-                  fill="var(--status-over)"
+                  fill={COLOR_RIDE}
                   radius={[8, 8, 0, 0]}
+                  isAnimationActive={true}
+                  animationDuration={300}
                 />
               )}
             </BarChart>

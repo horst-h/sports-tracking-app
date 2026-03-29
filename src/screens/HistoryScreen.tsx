@@ -11,7 +11,7 @@ import type { Sport, StravaActivityLike } from "../domain/metrics/types";
 import { buildMonthlySeries, buildMonthlyTotalSeries, type HistoryMetric } from "../domain/metrics/monthly";
 import { loadYearActivities } from "../repositories/activitiesRepository";
 import { formatNumber } from "../utils/format";
-import HistoryMonthlyChart from "../components/history/HistoryMonthlyChart";
+import HistoryMonthlyChart, { type SportFilter } from "../components/history/HistoryMonthlyChart";
 import HistoryMonthlyCompareChart, {
   type MonthlyCompareSeriesItem,
 } from "../components/history/HistoryMonthlyCompareChart";
@@ -149,6 +149,39 @@ function CategoryTabs({ value, onChange }: { value: TabOption; onChange: (next: 
   );
 }
 
+const SPORT_FILTER_OPTIONS: { value: SportFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "run", label: "Run" },
+  { value: "ride", label: "Ride" },
+];
+
+function SportFilterChips({
+  value,
+  onChange,
+}: {
+  value: SportFilter;
+  onChange: (next: SportFilter) => void;
+}) {
+  return (
+    <div className="sport-filter-chips" role="group" aria-label="Filter by sport">
+      {SPORT_FILTER_OPTIONS.map((option) => {
+        const isActive = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            className={`sport-filter-chip${isActive ? " sport-filter-chip--active" : ""}`}
+            onClick={() => onChange(option.value)}
+            aria-pressed={isActive}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function metricLabel(metric: HistoryMetric): string {
   if (metric === "distance") return "Distance";
   if (metric === "elevation") return "Elevation";
@@ -191,6 +224,7 @@ export default function HistoryScreen() {
   const [activeTab, setActiveTab] = useState<TabOption>("Distance");
   const [chartMode, setChartMode] = useState<"single" | "compare">("single");
   const [compareYear, setCompareYear] = useState<number | null>(null);
+  const [sportFilter, setSportFilter] = useState<SportFilter>("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -360,33 +394,62 @@ export default function HistoryScreen() {
     });
   }, [normalizedActivities, selectedMetric, selectedYear, currentYear]);
 
-  const primaryTotalSeries = useMemo(() => {
-    return buildMonthlyTotalSeries({
-      activities: normalizedActivities ?? [],
-      metric: selectedMetric,
-      year: selectedYear ?? currentYear,
-    });
-  }, [normalizedActivities, selectedMetric, selectedYear, currentYear]);
-
-  const secondaryTotalSeries = useMemo(() => {
-    return buildMonthlyTotalSeries({
+  // Unfiltered sport breakdown for the compare year (used to build stacked compare bars)
+  const secondaryMonthlySeries = useMemo(() => {
+    return buildMonthlySeries({
       activities: normalizedCompareActivities ?? [],
       metric: selectedMetric,
       year: compareYear ?? currentYear,
     });
   }, [normalizedCompareActivities, selectedMetric, compareYear, currentYear]);
 
+  const primaryTotalSeries = useMemo(() => {
+    const sportActivities =
+      sportFilter === "run"
+        ? (normalizedActivities ?? []).filter((a) => a.sport === "run")
+        : sportFilter === "ride"
+        ? (normalizedActivities ?? []).filter((a) => a.sport === "ride")
+        : (normalizedActivities ?? []);
+
+    return buildMonthlyTotalSeries({
+      activities: sportActivities,
+      metric: selectedMetric,
+      year: selectedYear ?? currentYear,
+    });
+  }, [normalizedActivities, selectedMetric, selectedYear, currentYear, sportFilter]);
+
+  const secondaryTotalSeries = useMemo(() => {
+    const sportActivities =
+      sportFilter === "run"
+        ? (normalizedCompareActivities ?? []).filter((a) => a.sport === "run")
+        : sportFilter === "ride"
+        ? (normalizedCompareActivities ?? []).filter((a) => a.sport === "ride")
+        : (normalizedCompareActivities ?? []);
+
+    return buildMonthlyTotalSeries({
+      activities: sportActivities,
+      metric: selectedMetric,
+      year: compareYear ?? currentYear,
+    });
+  }, [normalizedCompareActivities, selectedMetric, compareYear, currentYear, sportFilter]);
+
   const compareSeries: MonthlyCompareSeriesItem[] = useMemo(() => {
     return primaryTotalSeries.map((item, index) => {
       const secondaryValue = secondaryTotalSeries[index]?.value ?? 0;
+      const primaryMonthly = monthlySeries[index];
+      const secondaryMonthly = secondaryMonthlySeries[index];
       return {
         month: item.month,
         primary: item.value,
         secondary: secondaryValue,
         delta: secondaryValue - item.value,
+        primaryRun: primaryMonthly?.running ?? 0,
+        primaryRide: primaryMonthly?.cycling ?? 0,
+        secondaryRun: secondaryMonthly?.running ?? 0,
+        secondaryRide: secondaryMonthly?.cycling ?? 0,
       };
     });
-  }, [primaryTotalSeries, secondaryTotalSeries]);
+  }, [primaryTotalSeries, secondaryTotalSeries, monthlySeries, secondaryMonthlySeries]);
 
   if (!token) {
     return <LoginCard />;
@@ -526,6 +589,8 @@ export default function HistoryScreen() {
                       </div>
                     )}
 
+                    <SportFilterChips value={sportFilter} onChange={setSportFilter} />
+
                     <div className="history-chart__body">
                       {chartMode === "compare" && compareYear ? (
                         <HistoryMonthlyCompareChart
@@ -533,9 +598,14 @@ export default function HistoryScreen() {
                           data={compareSeries}
                           primaryYear={selectedYearValue}
                           secondaryYear={compareYear}
+                          sportFilter={sportFilter}
                         />
                       ) : (
-                        <HistoryMonthlyChart metric={selectedMetric} data={monthlySeries} />
+                        <HistoryMonthlyChart
+                          metric={selectedMetric}
+                          data={monthlySeries}
+                          sportFilter={sportFilter}
+                        />
                       )}
                     </div>
                   </div>
