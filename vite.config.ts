@@ -15,5 +15,8 @@ export default defineConfig({
       manifest: false, // Use external manifest.webmanifest
     }),
   ],
+  define: {
+    __VITE_BUILD_TIME__: JSON.stringify(new Date().toLocaleString("de-DE")),
+  },
   server: { port: 5173, strictPort: true },
 });

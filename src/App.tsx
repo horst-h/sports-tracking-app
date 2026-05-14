@@ -8,6 +8,8 @@ import YearlyCountGoalCard from "./components/YearlyCountGoalCard";
 import YearlyElevationGoalCard from "./components/YearlyElevationGoalCard";
 import BottomDrawer from "./components/BottomDrawer";
 import LoginCard from "./components/LoginCard";
+
+declare const __VITE_BUILD_TIME__: string;
 import PullToRefresh from "./components/PullToRefresh";
 
 import type { Sport, YearGoals, NormalizedActivity } from "./domain/metrics/types";
@@ -381,15 +383,22 @@ export default function App() {
       </main>
 
       <footer style={{
-        textAlign: 'center',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '1rem',
         padding: '1rem',
         fontSize: '0.875rem',
         color: 'var(--text-muted)',
         borderTop: '1px solid var(--border)',
-        marginTop: '1rem'
+        marginTop: '1rem',
+        flexWrap: 'wrap'
       }}>
-        <img src="/icons/strava-logo.svg" alt="Strava" style={{ height: '1rem', marginRight: '0.5rem' }} />
-        data provided by <a href="https://strava.com" style={{ color: 'var(--text-muted)', textDecoration: 'underline' }}>Strava®</a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <img src="/icons/strava-logo.svg" alt="Strava" style={{ height: '1rem' }} />
+          data provided by <a href="https://strava.com" style={{ color: 'var(--text-muted)', textDecoration: 'underline' }}>Strava®</a>
+        </div>
+        <span style={{ opacity: 0.6 }}>• Build: {__VITE_BUILD_TIME__}</span>
       </footer>
     </PullToRefresh>
   );
