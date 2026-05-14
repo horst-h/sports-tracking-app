@@ -104,26 +104,21 @@ export class NetlifyBlobsGoalsStore implements GoalsStore {
  * Factory: creates the appropriate store based on environment.
  */
 export function createGoalsStore(): GoalsStore {
-  const isNetlify = process.env.NETLIFY === "true";
-  const context = process.env.CONTEXT;
-  const nodeEnv = process.env.NODE_ENV;
   const forceMemory = process.env.GOALS_STORE === "memory";
-  const hasNetlifyContext = !!context;
-  const shouldTryBlobs = !forceMemory && (isNetlify || hasNetlifyContext || nodeEnv === "production");
 
   console.info(
     "[GoalsStore] Creating store - NETLIFY:",
-    isNetlify,
+    process.env.NETLIFY,
     "CONTEXT:",
-    context,
+    process.env.CONTEXT,
     "NODE_ENV:",
-    nodeEnv,
+    process.env.NODE_ENV,
     "GOALS_STORE:",
     process.env.GOALS_STORE
   );
 
-  if (!shouldTryBlobs) {
-    console.warn("[GoalsStore] ⚠️ Blobs disabled or unsupported context - using in-memory store (NOT PERSISTED)");
+  if (forceMemory) {
+    console.warn("[GoalsStore] ⚠️ GOALS_STORE=memory set - using in-memory store (NOT PERSISTED)");
     return new InMemoryGoalsStore();
   }
 
