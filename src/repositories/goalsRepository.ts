@@ -112,21 +112,31 @@ async function getAccessToken(): Promise<string | null> {
  */
 async function fetchGoalFromBackend(year: number, sport: Sport): Promise<RemoteGoal | null> {
   const token = await getAccessToken();
-  if (!token) return null;
+  if (!token) {
+    console.warn(`[GoalsRepository] No valid token for fetching goal (${year}/${sport})`);
+    return null;
+  }
 
   try {
     const url = `${API_BASE}?year=${year}&sport=${sport}`;
+    console.info(`[GoalsRepository] Fetching goal from backend: ${url}`);
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.warn(`[GoalsRepository] Failed to fetch goal (${year}/${sport}): HTTP ${response.status}`);
+      return null;
+    }
 
     const data = await response.json();
-    return data.goal ?? null;
-  } catch {
+    const goal = data.goal ?? null;
+    console.info(`[GoalsRepository] Fetched goal (${year}/${sport}):`, goal);
+    return goal;
+  } catch (error) {
+    console.error(`[GoalsRepository] Error fetching goal (${year}/${sport}):`, error);
     return null;
   }
 }
@@ -140,9 +150,13 @@ async function saveGoalToBackend(
   goalData: RemoteGoalData
 ): Promise<RemoteGoal | null> {
   const token = await getAccessToken();
-  if (!token) return null;
+  if (!token) {
+    console.warn(`[GoalsRepository] No valid token for saving goal (${year}/${sport})`);
+    return null;
+  }
 
   try {
+    console.info(`[GoalsRepository] Saving goal to backend (${year}/${sport}):`, goalData);
     const response = await fetch(API_BASE, {
       method: "PUT",
       headers: {
@@ -156,11 +170,17 @@ async function saveGoalToBackend(
       }),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.error(`[GoalsRepository] Failed to save goal (${year}/${sport}): HTTP ${response.status}`);
+      return null;
+    }
 
     const data = await response.json();
-    return data.goal ?? null;
-  } catch {
+    const savedGoal = data.goal ?? null;
+    console.info(`[GoalsRepository] Goal saved successfully (${year}/${sport}):`, savedGoal);
+    return savedGoal;
+  } catch (error) {
+    console.error(`[GoalsRepository] Error saving goal (${year}/${sport}):`, error);
     return null;
   }
 }
@@ -170,10 +190,14 @@ async function saveGoalToBackend(
  */
 async function deleteGoalFromBackend(year: number, sport: Sport): Promise<boolean> {
   const token = await getAccessToken();
-  if (!token) return false;
+  if (!token) {
+    console.warn(`[GoalsRepository] No valid token for deleting goal (${year}/${sport})`);
+    return false;
+  }
 
   try {
     const url = `${API_BASE}?year=${year}&sport=${sport}`;
+    console.info(`[GoalsRepository] Deleting goal from backend: ${url}`);
     const response = await fetch(url, {
       method: "DELETE",
       headers: {
@@ -181,11 +205,17 @@ async function deleteGoalFromBackend(year: number, sport: Sport): Promise<boolea
       },
     });
 
-    if (!response.ok) return false;
+    if (!response.ok) {
+      console.error(`[GoalsRepository] Failed to delete goal (${year}/${sport}): HTTP ${response.status}`);
+      return false;
+    }
 
     const data = await response.json();
-    return data.ok ?? false;
-  } catch {
+    const success = data.ok ?? false;
+    console.info(`[GoalsRepository] Goal deleted (${year}/${sport}):`, success);
+    return success;
+  } catch (error) {
+    console.error(`[GoalsRepository] Error deleting goal (${year}/${sport}):`, error);
     return false;
   }
 }
@@ -258,6 +288,8 @@ async function deleteFromCache(year: number): Promise<void> {
  * Syncs with backend if authenticated, otherwise saves locally only.
  */
 export async function saveGoals(year: number, goals: YearGoals): Promise<void> {
+  console.info(`[GoalsRepository] saveGoals() called for year ${year}:`, goals);
+  
   const normalizedGoals = normalizeYearGoals(year, goals);
   
   // Try to sync with backend
@@ -269,9 +301,13 @@ export async function saveGoals(year: number, goals: YearGoals): Promise<void> {
     
     // Only save if there's some data
     if (Object.keys(sportData).length > 0) {
+      console.info(`[GoalsRepository] Attempting to save ${sport} goal to backend`);
       const saved = await saveGoalToBackend(year, sport, sportData);
       if (saved) {
+        console.info(`[GoalsRepository] ✅ Successfully saved ${sport} goal to backend`);
         remoteGoals.push(saved);
+      } else {
+        console.warn(`[GoalsRepository] ⚠️ Failed to save ${sport} goal to backend`);
       }
     }
   }
@@ -281,8 +317,11 @@ export async function saveGoals(year: number, goals: YearGoals): Promise<void> {
     ? Math.max(...remoteGoals.map(g => g.version))
     : undefined;
   
+  console.info(`[GoalsRepository] Synced ${remoteGoals.length} goals to backend, maxVersion: ${maxVersion}`);
+  
   // Always save to local cache
   await saveToCache(year, normalizedGoals, maxVersion);
+  console.info(`[GoalsRepository] ✅ Goals saved to local cache`);
 }
 
 /**
@@ -292,8 +331,11 @@ export async function saveGoals(year: number, goals: YearGoals): Promise<void> {
  * then fetches from backend and updates if newer.
  */
 export async function loadGoals(year: number): Promise<YearGoals | null> {
+  console.info(`[GoalsRepository] loadGoals() called for year ${year}`);
+  
   // Load from cache immediately
   const cached = await loadFromCache(year);
+  console.info(`[GoalsRepository] Loaded from local cache:`, cached);
   
   // Try to fetch from backend in background
   const sports: Sport[] = ["run", "ride"];
@@ -301,23 +343,34 @@ export async function loadGoals(year: number): Promise<YearGoals | null> {
   
   // Don't wait for backend, use cache as initial value
   const cacheResult = cached?.goals ?? null;
+  console.info(`[GoalsRepository] Returning immediately with cache result`);
   
   // Background revalidation
   Promise.all(fetchPromises).then(async (remoteGoals) => {
     const validGoals = remoteGoals.filter((g): g is RemoteGoal => g !== null);
     
-    if (validGoals.length === 0) return; // No backend data
+    if (validGoals.length === 0) {
+      console.info(`[GoalsRepository] No backend goals found for year ${year}`);
+      return;
+    }
+    
+    console.info(`[GoalsRepository] Background sync: received ${validGoals.length} goals from backend`);
     
     const maxVersion = Math.max(...validGoals.map(g => g.version));
     const cachedVersion = cached?.version ?? 0;
     
+    console.info(`[GoalsRepository] Version check - Backend: ${maxVersion}, Cache: ${cachedVersion}`);
+    
     // Only update if backend is newer
     if (maxVersion > cachedVersion) {
+      console.info(`[GoalsRepository] ✅ Backend is newer, updating cache`);
       const yearGoals = remoteGoalsToYearGoals(year, validGoals);
       await saveToCache(year, yearGoals, maxVersion);
+    } else {
+      console.info(`[GoalsRepository] Cache is up-to-date, no update needed`);
     }
-  }).catch(() => {
-    // Ignore background errors
+  }).catch((error) => {
+    console.error(`[GoalsRepository] Background sync error:`, error);
   });
   
   return cacheResult;
@@ -328,14 +381,21 @@ export async function loadGoals(year: number): Promise<YearGoals | null> {
  * Deletes from both backend and local cache.
  */
 export async function deleteGoals(year: number): Promise<void> {
+  console.info(`[GoalsRepository] deleteGoals() called for year ${year}`);
+  
   // Try to delete from backend
   const sports: Sport[] = ["run", "ride"];
-  await Promise.all(
-    sports.map(sport => deleteGoalFromBackend(year, sport))
-  );
+  const deletePromises = sports.map(sport => {
+    console.info(`[GoalsRepository] Deleting ${sport} goal from backend`);
+    return deleteGoalFromBackend(year, sport);
+  });
+  
+  const results = await Promise.all(deletePromises);
+  console.info(`[GoalsRepository] Backend deletions: ${results.filter(Boolean).length}/${results.length} successful`);
   
   // Always delete from cache
   await deleteFromCache(year);
+  console.info(`[GoalsRepository] ✅ Goals deleted from local cache`);
 }
 
 /**

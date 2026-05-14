@@ -78,16 +78,22 @@ export const handler: Handler = async (event) => {
     return json(200, {});
   }
 
+  console.info(`[Goals API] Incoming ${event.httpMethod} request`);
+
   // Extract and validate token
   const token = extractBearerToken(event.headers.authorization);
   if (!token) {
+    console.warn("[Goals API] Missing authorization token");
     return json(401, { error: "missing_authorization" });
   }
 
   const athlete = await validateStravaToken(token);
   if (!athlete) {
+    console.warn("[Goals API] Invalid/expired token");
     return json(401, { error: "invalid_token" });
   }
+
+  console.info(`[Goals API] Authenticated athlete: ${athlete.id}`);
 
   const store = createGoalsStore();
 
@@ -98,14 +104,18 @@ export const handler: Handler = async (event) => {
 
     const year = parseYear(yearParam);
     if (!year) {
+      console.warn("[Goals API] Invalid year parameter:", yearParam);
       return json(400, { error: "invalid_year" });
     }
 
     if (!isValidSport(sportParam)) {
+      console.warn("[Goals API] Invalid sport parameter:", sportParam);
       return json(400, { error: "invalid_sport" });
     }
 
+    console.info(`[Goals API] Fetching goal: athlete=${athlete.id}, year=${year}, sport=${sportParam}`);
     const goal = await store.get(athlete.id, year, sportParam);
+    console.info(`[Goals API] Goal found:`, goal ? "yes" : "no");
     return json(200, { goal });
   }
 
@@ -115,22 +125,28 @@ export const handler: Handler = async (event) => {
     try {
       body = JSON.parse(event.body || "{}");
     } catch {
+      console.warn("[Goals API] Invalid JSON in request body");
       return json(400, { error: "invalid_json" });
     }
 
     const year = parseYear(body.year);
     if (!year) {
+      console.warn("[Goals API] Invalid year:", body.year);
       return json(400, { error: "invalid_year" });
     }
 
     if (!isValidSport(body.sport)) {
+      console.warn("[Goals API] Invalid sport:", body.sport);
       return json(400, { error: "invalid_sport" });
     }
 
     const goalData = validateGoalData(body);
     if (goalData === null) {
+      console.warn("[Goals API] Invalid goal data:", body);
       return json(400, { error: "invalid_goal_data" });
     }
+
+    console.info(`[Goals API] Saving goal: athlete=${athlete.id}, year=${year}, sport=${body.sport}`, goalData);
 
     // Load existing or create new
     const existing = await store.get(athlete.id, year, body.sport);
@@ -147,6 +163,7 @@ export const handler: Handler = async (event) => {
     };
 
     const saved = await store.set(storedGoal);
+    console.info(`[Goals API] Goal saved successfully with version ${saved.version}`);
     return json(200, { goal: saved });
   }
 
@@ -157,16 +174,21 @@ export const handler: Handler = async (event) => {
 
     const year = parseYear(yearParam);
     if (!year) {
+      console.warn("[Goals API] Invalid year for deletion:", yearParam);
       return json(400, { error: "invalid_year" });
     }
 
     if (!isValidSport(sportParam)) {
+      console.warn("[Goals API] Invalid sport for deletion:", sportParam);
       return json(400, { error: "invalid_sport" });
     }
 
+    console.info(`[Goals API] Deleting goal: athlete=${athlete.id}, year=${year}, sport=${sportParam}`);
     const deleted = await store.delete(athlete.id, year, sportParam);
+    console.info(`[Goals API] Goal deletion result:`, deleted);
     return json(200, { ok: deleted });
   }
 
+  console.warn(`[Goals API] Unsupported HTTP method: ${event.httpMethod}`);
   return json(405, { error: "method_not_allowed" });
 };

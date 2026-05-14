@@ -47,7 +47,9 @@ export class NetlifyBlobsGoalsStore implements GoalsStore {
     try {
       const { getStore } = require("@netlify/blobs");
       this.getStore = getStore;
-    } catch {
+      console.info("[NetlifyBlobsGoalsStore] Initialized successfully");
+    } catch (error) {
+      console.error("[NetlifyBlobsGoalsStore] Failed to load @netlify/blobs:", error);
       throw new Error("@netlify/blobs not available");
     }
   }
@@ -58,26 +60,41 @@ export class NetlifyBlobsGoalsStore implements GoalsStore {
 
   async get(athleteId: number, year: number, sport: Sport): Promise<StoredGoal | null> {
     try {
+      const key = this.key(athleteId, year, sport);
       const store = this.getStore("goals");
-      const json = await store.get(this.key(athleteId, year, sport), { type: "json" });
+      const json = await store.get(key, { type: "json" });
+      if (json) {
+        console.info(`[NetlifyBlobsGoalsStore] Retrieved goal: ${key}`, json);
+      }
       return json ?? null;
-    } catch {
+    } catch (error) {
+      console.error(`[NetlifyBlobsGoalsStore] Error retrieving goal: athleteId=${athleteId}, year=${year}, sport=${sport}`, error);
       return null;
     }
   }
 
   async set(goal: StoredGoal): Promise<StoredGoal> {
-    const store = this.getStore("goals");
-    await store.setJSON(this.key(goal.athleteId, goal.year, goal.sport), goal);
-    return goal;
+    try {
+      const key = this.key(goal.athleteId, goal.year, goal.sport);
+      const store = this.getStore("goals");
+      await store.setJSON(key, goal);
+      console.info(`[NetlifyBlobsGoalsStore] Saved goal: ${key}`, goal);
+      return goal;
+    } catch (error) {
+      console.error("[NetlifyBlobsGoalsStore] Error saving goal:", error, goal);
+      throw error;
+    }
   }
 
   async delete(athleteId: number, year: number, sport: Sport): Promise<boolean> {
     try {
+      const key = this.key(athleteId, year, sport);
       const store = this.getStore("goals");
-      await store.delete(this.key(athleteId, year, sport));
+      await store.delete(key);
+      console.info(`[NetlifyBlobsGoalsStore] Deleted goal: ${key}`);
       return true;
-    } catch {
+    } catch (error) {
+      console.error(`[NetlifyBlobsGoalsStore] Error deleting goal: ${key}`, error);
       return false;
     }
   }
@@ -88,16 +105,22 @@ export class NetlifyBlobsGoalsStore implements GoalsStore {
  */
 export function createGoalsStore(): GoalsStore {
   const isNetlify = process.env.NETLIFY === "true";
+  const nodeEnv = process.env.NODE_ENV;
+
+  console.info("[GoalsStore] Creating store - NETLIFY env:", isNetlify, "NODE_ENV:", nodeEnv);
 
   if (!isNetlify) {
-    console.info("[GoalsStore] Using in-memory store (local development)");
+    console.warn("[GoalsStore] ⚠️ NETLIFY environment not set - using in-memory store (NOT PERSISTED)");
     return new InMemoryGoalsStore();
   }
 
   try {
-    return new NetlifyBlobsGoalsStore();
+    console.info("[GoalsStore] Attempting to initialize Netlify Blobs store...");
+    const store = new NetlifyBlobsGoalsStore();
+    console.info("[GoalsStore] ✅ Successfully using Netlify Blobs for persistence");
+    return store;
   } catch (error) {
-    console.warn("[GoalsStore] Netlify Blobs unavailable, using in-memory fallback:", error);
+    console.error("[GoalsStore] ❌ Netlify Blobs initialization failed, falling back to in-memory (NOT PERSISTED):", error);
     return new InMemoryGoalsStore();
   }
 }
