@@ -53,7 +53,8 @@ export default function GoalField({
     const trimmed = raw.trim();
     if (!trimmed) return undefined;
 
-    const num = Number(trimmed);
+    const normalized = allowDecimal ? trimmed.replace(",", ".") : trimmed;
+    const num = Number(normalized);
     if (!Number.isFinite(num) || num < 0) {
       return null;
     }

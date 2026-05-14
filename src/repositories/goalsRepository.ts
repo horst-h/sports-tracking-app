@@ -1,6 +1,8 @@
 import { openSportsDB } from "./db.ts";
 import type { YearGoals, Sport, GoalMetric } from "../domain/metrics/types.ts";
 import { loadToken } from "./tokenRepository.ts";
+import { withValidAccessToken } from "./tokenRepository.ts";
+import { refreshAccessToken } from "../services/stravaAuthApi.ts";
 
 const STORE = "goals";
 
@@ -96,15 +98,9 @@ const API_BASE = "/.netlify/functions/goals";
 async function getAccessToken(): Promise<string | null> {
   const token = await loadToken();
   if (!token) return null;
-  
-  // Check if token is expired
-  const now = Math.floor(Date.now() / 1000);
-  if (token.expires_at <= now) {
-    // Token expired, client should refresh
-    return null;
-  }
-  
-  return token.access_token;
+
+  // Reuse the same refresh flow as Strava activity requests.
+  return withValidAccessToken(refreshAccessToken, { skewSeconds: 60 });
 }
 
 /**
@@ -340,8 +336,28 @@ export async function loadGoals(year: number): Promise<YearGoals | null> {
   // Try to fetch from backend in background
   const sports: Sport[] = ["run", "ride"];
   const fetchPromises = sports.map(sport => fetchGoalFromBackend(year, sport));
-  
-  // Don't wait for backend, use cache as initial value
+
+  // If cache is empty, wait for backend once so users immediately see existing goals.
+  if (!cached) {
+    try {
+      const remoteGoals = await Promise.all(fetchPromises);
+      const validGoals = remoteGoals.filter((g): g is RemoteGoal => g !== null);
+
+      if (validGoals.length > 0) {
+        const maxVersion = Math.max(...validGoals.map(g => g.version));
+        const yearGoals = remoteGoalsToYearGoals(year, validGoals);
+        await saveToCache(year, yearGoals, maxVersion);
+        console.info(`[GoalsRepository] Cache miss resolved from backend with ${validGoals.length} goals`);
+        return yearGoals;
+      }
+    } catch (error) {
+      console.error(`[GoalsRepository] Cache miss backend fetch failed:`, error);
+    }
+
+    return null;
+  }
+
+  // With cached data, keep stale-while-revalidate behavior.
   const cacheResult = cached?.goals ?? null;
   console.info(`[GoalsRepository] Returning immediately with cache result`);
   
