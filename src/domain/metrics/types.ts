@@ -1,18 +1,8 @@
-// Swimming: Elevation is not tracked (always 0)
-export type Sport = "run" | "ride" | "swim";
+import type { SportType } from "../sport.ts";
 
-export interface StravaActivityLike {
-  id: number | string;
-  type: string;                // e.g. "Run", "Ride"
-  start_date_local: string;    // ISO string
-  distance: number;            // meters
-  total_elevation_gain: number;// meters
-  moving_time: number;         // seconds
-  elapsed_time?: number;       // seconds
-  workout_type?: number | null;
-  commute?: boolean;
-  trainer?: boolean;           // indoor
-}
+// Single definition, shared with the domain model.
+// Swimming: elevation is not tracked (always 0).
+export type Sport = SportType;
 
 export interface NormalizedActivity {
   id: string;

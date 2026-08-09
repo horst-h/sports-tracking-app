@@ -34,34 +34,6 @@ type StatsWithForecasts = UiAthleteStats & {
   };
 };
 
-function toStravaLike(a: any) {
-  if (!a || typeof a !== "object") return a;
-
-  // already Strava-like
-  if (typeof a.type === "string" && typeof a.start_date_local === "string" && typeof a.distance === "number") {
-    return a;
-  }
-
-  // domain-like (your cached activities)
-  if (
-    (a.sport === "run" || a.sport === "ride" || a.sport === "swim") &&
-    typeof a.startDate === "string" &&
-    typeof a.distanceKm === "number"
-  ) {
-    return {
-      id: a.id,
-      type: a.sport === "run" ? "Run" : a.sport === "ride" ? "Ride" : "Swim",
-      start_date_local: a.startDate,
-      distance: a.distanceKm * 1000,
-      total_elevation_gain: Number(a.elevationM ?? 0),
-      moving_time: Number(a.movingTimeSec ?? 0),
-      name: a.name,
-    };
-  }
-
-  return a;
-}
-
 function emptyGoals(year: number): YearGoals {
   return { year, perSport: { run: {}, ride: {}, swim: {} } };
 }
@@ -177,9 +149,7 @@ export default function App() {
     const asOfLocalIso = new Date().toISOString();
     const retrievedAtLocal = new Date().toString();
 
-    // normalize expects Strava-like; your activities are domain-like
-    const stravaLike = activities.map(toStravaLike);
-    const normalized = normalizeActivities(stravaLike as any);
+    const normalized = normalizeActivities(activities);
 
     function buildForSport(s: Sport): StatsWithForecasts {
       const agg = aggregateYear(normalized, year, s, asOfLocalIso);
@@ -283,7 +253,7 @@ export default function App() {
           syncStatus={syncStatus}
           lastSync={lastSync}
           avatarText="HH"
-          avatarImage={athlete?.profile_medium}
+          avatarImage={athlete?.avatarUrl}
           onAvatarClick={() => setSettingsOpen(true)}
         />
         <SportSwitcher value={sport} onChange={handleSportChange} />

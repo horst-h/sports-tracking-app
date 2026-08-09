@@ -7,7 +7,7 @@ import { fetchYearActivitiesLive, useActivities } from "../hooks/useActivities";
 import { useAuth } from "../hooks/useAuth";
 import { normalizeActivities } from "../domain/metrics/normalize";
 import { aggregateYear } from "../domain/metrics/aggregate";
-import type { Sport, StravaActivityLike } from "../domain/metrics/types";
+import type { Sport } from "../domain/metrics/types";
 import { buildMonthlySeries, buildMonthlyTotalSeries, type HistoryMetric } from "../domain/metrics/monthly";
 import { loadYearActivities } from "../repositories/activitiesRepository";
 import { formatNumber } from "../utils/format";
@@ -30,37 +30,6 @@ type SportSummary = {
   sport: Sport;
   totals: SummaryTotals;
 };
-
-function toStravaLike(a: unknown): StravaActivityLike | null {
-  if (!a || typeof a !== "object") return null;
-  const record = a as Record<string, unknown>;
-
-  if (
-    typeof record.type === "string" &&
-    typeof record.start_date_local === "string" &&
-    typeof record.distance === "number"
-  ) {
-    return record as unknown as StravaActivityLike;
-  }
-
-  if (
-    (record.sport === "run" || record.sport === "ride" || record.sport === "swim") &&
-    typeof record.startDate === "string" &&
-    typeof record.distanceKm === "number"
-  ) {
-    return {
-      id: record.id as string | number,
-      type: record.sport === "run" ? "Run" : record.sport === "ride" ? "Ride" : "Swim",
-      start_date_local: record.startDate,
-      distance: record.distanceKm * 1000,
-      total_elevation_gain: Number(record.elevationM ?? 0),
-      moving_time: Number(record.movingTimeSec ?? 0),
-    } satisfies StravaActivityLike;
-  }
-
-  return null;
-}
-
 
 function YearChips({
   years,
@@ -358,14 +327,12 @@ export default function HistoryScreen() {
 
   const normalizedActivities = useMemo(() => {
     if (!activities || activities.length === 0 || !selectedYear) return null;
-    const stravaLike = activities.map(toStravaLike).filter((item): item is StravaActivityLike => !!item);
-    return normalizeActivities(stravaLike);
+    return normalizeActivities(activities);
   }, [activities, selectedYear]);
 
   const normalizedCompareActivities = useMemo(() => {
     if (!compareActivities || compareActivities.length === 0 || !compareYear) return null;
-    const stravaLike = compareActivities.map(toStravaLike).filter((item): item is StravaActivityLike => !!item);
-    return normalizeActivities(stravaLike);
+    return normalizeActivities(compareActivities);
   }, [compareActivities, compareYear]);
 
   const summaries = useMemo(() => {

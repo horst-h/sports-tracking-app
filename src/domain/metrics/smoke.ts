@@ -1,34 +1,49 @@
 import { normalizeActivities } from "./normalize.ts";
 import { aggregateYear } from "./aggregate.ts";
 import { buildUiAthleteStats } from "./uiStats.ts";
-import type { StravaActivityLike } from "./types.ts";
+import type { Activity } from "../activity.ts";
 
 
 // Minimal sample data (Run + Ride)
-const sample: StravaActivityLike[] = [
+const sample: Activity[] = [
   {
-    id: 1,
-    type: "Run",
-    start_date_local: "2025-11-01T07:10:00",
-    distance: 12000,
-    total_elevation_gain: 180,
-    moving_time: 4200,
+    id: "1",
+    provider: "strava",
+    sport: "run",
+    name: "Sample run",
+    startDateLocal: "2025-11-01T07:10:00",
+    startDateUtc: "2025-11-01T06:10:00Z",
+    distanceKm: 12,
+    elevationM: 180,
+    movingTimeSec: 4200,
+    isCommute: false,
+    isIndoor: false,
   },
   {
-    id: 2,
-    type: "Run",
-    start_date_local: "2025-11-10T07:20:00",
-    distance: 8000,
-    total_elevation_gain: 90,
-    moving_time: 2600,
+    id: "2",
+    provider: "strava",
+    sport: "run",
+    name: "Sample run 2",
+    startDateLocal: "2025-11-10T07:20:00",
+    startDateUtc: "2025-11-10T06:20:00Z",
+    distanceKm: 8,
+    elevationM: 90,
+    movingTimeSec: 2600,
+    isCommute: false,
+    isIndoor: false,
   },
   {
-    id: 3,
-    type: "Ride",
-    start_date_local: "2025-11-12T10:00:00",
-    distance: 42000,
-    total_elevation_gain: 600,
-    moving_time: 5400,
+    id: "3",
+    provider: "strava",
+    sport: "ride",
+    name: "Sample ride",
+    startDateLocal: "2025-11-12T10:00:00",
+    startDateUtc: "2025-11-12T09:00:00Z",
+    distanceKm: 42,
+    elevationM: 600,
+    movingTimeSec: 5400,
+    isCommute: false,
+    isIndoor: false,
   },
 ];
 

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import type { GoalMetric, Sport, StravaActivityLike, YearGoals } from "../domain/metrics/types";
+import type { GoalMetric, Sport, YearGoals } from "../domain/metrics/types";
 import { useGoals } from "../hooks/useGoals";
 import { useActivities } from "../hooks/useActivities";
 import { useAuth } from "../hooks/useAuth";
@@ -50,36 +50,6 @@ function emptyGoals(year: number): YearGoals {
   return { year, perSport: { run: {}, ride: {}, swim: {} } };
 }
 
-function toStravaLike(a: unknown): StravaActivityLike | null {
-  if (!a || typeof a !== "object") return null;
-  const record = a as Record<string, unknown>;
-
-  if (
-    typeof record.type === "string" &&
-    typeof record.start_date_local === "string" &&
-    typeof record.distance === "number"
-  ) {
-    return record as unknown as StravaActivityLike;
-  }
-
-  if (
-    (record.sport === "run" || record.sport === "ride" || record.sport === "swim") &&
-    typeof record.startDate === "string" &&
-    typeof record.distanceKm === "number"
-  ) {
-    return {
-      id: record.id as string | number,
-      type: record.sport === "run" ? "Run" : record.sport === "ride" ? "Ride" : "Swim",
-      start_date_local: record.startDate,
-      distance: record.distanceKm * 1000,
-      total_elevation_gain: Number(record.elevationM ?? 0),
-      moving_time: Number(record.movingTimeSec ?? 0),
-    } satisfies StravaActivityLike;
-  }
-
-  return null;
-}
-
 export default function GoalsPage() {
   const navigate = useNavigate();
   const { sport: sportParam } = useParams();
@@ -109,8 +79,7 @@ export default function GoalsPage() {
     const asOfLocalIso = new Date().toISOString();
     const retrievedAtLocal = new Date().toString();
 
-    const stravaLike = activities.map(toStravaLike).filter((item): item is StravaActivityLike => !!item);
-    const normalized = normalizeActivities(stravaLike);
+    const normalized = normalizeActivities(activities);
 
     function buildForSport(s: Sport) {
       const agg = aggregateYear(normalized, year, s, asOfLocalIso);

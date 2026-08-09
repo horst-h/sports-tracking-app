@@ -4,44 +4,7 @@ import { buildUiAthleteStats } from "../domain/metrics/uiStats";
 import type { ForecastMode, UiAthleteStats } from "../domain/metrics/uiStats";
 import type { YearGoals } from "../domain/metrics/types";
 import { loadGoals } from "../repositories/goalsRepository";
-
-function toStravaLike(a: any) {
-  if (!a || typeof a !== "object") return a;
-
-  // Already Strava-like
-  if (
-    typeof a.type === "string" &&
-    typeof a.start_date_local === "string" &&
-    typeof a.distance === "number"
-  ) {
-    return a;
-  }
-
-  // Domain-like (your cached activities)
-  if (
-    (a.sport === "run" || a.sport === "ride" || a.sport === "swim") &&
-    typeof a.startDate === "string" &&
-    typeof a.distanceKm === "number"
-  ) {
-    return {
-      id: a.id,
-      type: a.sport === "run" ? "Run" : a.sport === "ride" ? "Ride" : "Swim",
-      start_date_local: a.startDate,
-      distance: a.distanceKm * 1000, // meters
-      total_elevation_gain: Number(a.elevationM ?? 0),
-      moving_time: Number(a.movingTimeSec ?? 0),
-      name: a.name,
-    };
-  }
-
-  // fallback
-  return a;
-}
-
-
-// StravaActivity shape is compatible enough for normalization in your domain.
-// We keep this intentionally loose so we can pass StravaActivity[] directly.
-export type ActivityInput = any;
+import type { Activity } from "../domain/activity";
 
 export type YearDashboard = {
   year: number;
@@ -64,7 +27,7 @@ function nowLocalString() {
 
 export async function buildYearDashboard(params: {
   year: number;
-  activities: ActivityInput[];
+  activities: Activity[];
   mode?: ForecastMode;
   blendWeightRolling?: number;
   asOfDateLocal?: string; // defaults to now ISO
@@ -82,8 +45,7 @@ export async function buildYearDashboard(params: {
   // 1) Load goals (optional)
   const goals = await loadGoals(year);
 
-  const stravaLike = activities.map(toStravaLike);
-  const normalized = normalizeActivities(stravaLike as any);
+  const normalized = normalizeActivities(activities);
 
   // 3) Aggregate per sport
   const runAgg = aggregateYear(normalized, year, "run", asOfDateLocal);
@@ -124,7 +86,7 @@ const ride = buildUiAthleteStats({
  */
 export async function buildYearDashboardNow(params: {
   year: number;
-  activities: ActivityInput[];
+  activities: Activity[];
   mode?: ForecastMode;
   blendWeightRolling?: number;
 }): Promise<YearDashboard> {

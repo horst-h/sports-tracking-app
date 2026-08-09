@@ -4,7 +4,7 @@ import type { YearSportStats } from "./stats";
 
 export function calcYearSportStats(year: number, sport: SportType, activities: Activity[]): YearSportStats {
   const filtered = activities.filter(a => {
-    const y = new Date(a.startDate).getFullYear();
+    const y = new Date(a.startDateLocal).getFullYear();
     return y === year && a.sport === sport;
   });
 

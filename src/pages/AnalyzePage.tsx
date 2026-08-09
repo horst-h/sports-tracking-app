@@ -43,37 +43,6 @@ function calculateGoalStatus(requiredPerWeek: number, trendPerWeek: number): "on
   return "off_track";
 }
 
-// Helper: Convert domain activity to Strava-like (same as App.tsx)
-function toStravaLike(a: any) {
-  if (!a || typeof a !== 'object') return a;
-
-  if (
-    typeof a.type === 'string' &&
-    typeof a.start_date_local === 'string' &&
-    typeof a.distance === 'number'
-  ) {
-    return a;
-  }
-
-  if (
-    (a.sport === 'run' || a.sport === 'ride' || a.sport === 'swim') &&
-    typeof a.startDate === 'string' &&
-    typeof a.distanceKm === 'number'
-  ) {
-    return {
-      id: a.id,
-      type: a.sport === 'run' ? 'Run' : a.sport === 'ride' ? 'Ride' : 'Swim',
-      start_date_local: a.startDate,
-      distance: a.distanceKm * 1000,
-      total_elevation_gain: Number(a.elevationM ?? 0),
-      moving_time: Number(a.movingTimeSec ?? 0),
-      name: a.name,
-    };
-  }
-
-  return a;
-}
-
 export default function AnalyzePage() {
   const navigate = useNavigate();
   const { sport: sportParam, metric: metricParam } = useParams();
@@ -127,8 +96,7 @@ export default function AnalyzePage() {
     const asOfLocalIso = new Date().toISOString();
     const retrievedAtLocal = new Date().toString();
 
-    const stravaLike = activities.map(toStravaLike);
-    const normalized = normalizeActivities(stravaLike as any);
+    const normalized = normalizeActivities(activities);
     const agg = aggregateYear(normalized, year, sport, asOfLocalIso);
     const sportGoals = goals?.perSport?.[sport];
 
@@ -149,8 +117,7 @@ export default function AnalyzePage() {
     if (!token || !activities || activities.length === 0) return null;
 
     const asOfLocalIso = new Date().toISOString();
-    const stravaLike = activities.map(toStravaLike);
-    const normalized = normalizeActivities(stravaLike as any);
+    const normalized = normalizeActivities(activities);
     const agg = aggregateYear(normalized, year, sport, asOfLocalIso);
 
     return agg;
@@ -171,8 +138,7 @@ export default function AnalyzePage() {
     
     if (!activities || !otherSportGoals) return null;
     
-    const stravaLike = activities.map(toStravaLike);
-    const normalized = normalizeActivities(stravaLike as any);
+    const normalized = normalizeActivities(activities);
     const agg = aggregateYear(normalized, year, otherSport, new Date().toISOString());
     
     return buildUiAthleteStats({

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ForecastMode } from "../domain/metrics/uiStats";
 import { loadToken, clearToken } from "../repositories/tokenRepository";
-import { stravaClient } from "../data/strava/stravaClient";
+import { getActivityProvider } from "../data/providerRegistry";
 import type { YearDashboard } from "../services/statsService";
 import { buildYearDashboard } from "../services/statsService";
 
@@ -45,29 +45,14 @@ export default function DebugPanel() {
     }));
   }
 
-  async function loadDashboardFromStrava() {
+  async function loadDashboardFromProvider() {
     setLoading(true);
     setErr(null);
     try {
       const asOfLocalIso = new Date().toISOString();
       const retrievedAtLocal = nowLocalString();
 
-      // Pull activities for year
-      const after = Math.floor(new Date(year, 0, 1).getTime() / 1000);
-      const before = Math.floor(new Date(year + 1, 0, 1).getTime() / 1000);
-
-      // Fetch pages until empty (simple, debug-only)
-      const all: any[] = [];
-      let page = 1;
-      const perPage = 200;
-
-      while (true) {
-        const chunk = await stravaClient.listActivities({ page, perPage, after, before });
-        all.push(...chunk);
-        if (chunk.length < perPage) break;
-        page += 1;
-        if (page > 20) break; // safety
-      }
+      const all = await getActivityProvider().listYearActivities(year);
 
       const dashboard = await buildYearDashboard({
         year,
@@ -177,8 +162,8 @@ export default function DebugPanel() {
             )}
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button disabled={loading} onClick={loadDashboardFromStrava} style={{ padding: "6px 10px" }}>
-                {loading ? "Loading…" : "Load dashboard from Strava"}
+              <button disabled={loading} onClick={loadDashboardFromProvider} style={{ padding: "6px 10px" }}>
+                {loading ? "Loading…" : "Load dashboard from provider"}
               </button>
               <button onClick={runSmokeInBrowser} style={{ padding: "6px 10px" }}>
                 Run smoke (browser)

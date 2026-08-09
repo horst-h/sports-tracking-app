@@ -1,36 +1,12 @@
 import { useEffect, useState } from "react";
-import { stravaClient } from "../data/strava/stravaClient";
-import { toDomainActivity } from "../data/strava/stravaMapper";
+import { getActivityProvider } from "../data/providerRegistry";
 import type { Activity } from "../domain/activity";
 import { loadYearActivities, saveYearActivities } from "../repositories/activitiesRepository";
-
-function yearRangeUnixSeconds(year: number) {
-  const start = Date.UTC(year, 0, 1, 0, 0, 0) / 1000;       // Jan 1
-  const end = Date.UTC(year + 1, 0, 1, 0, 0, 0) / 1000;     // Jan 1 next year
-  return { after: Math.floor(start), before: Math.floor(end) };
-}
 
 const CACHE_TTL_MS = 3 * 60 * 60 * 1000; // 3h
 
 export async function fetchYearActivitiesLive(year: number): Promise<Activity[]> {
-  const { after, before } = yearRangeUnixSeconds(year);
-
-  const perPage = 50;
-  const all: Activity[] = [];
-
-  for (let page = 1; ; page++) {
-    const raw = await stravaClient.listActivities({ page, perPage, after, before });
-    if (raw.length === 0) break;
-
-    for (const r of raw) {
-      const mapped = toDomainActivity(r);
-      if (mapped) all.push(mapped);
-    }
-
-    // safety: Strava max is usually 200 per_page; with 50 this is fine.
-    if (raw.length < perPage) break;
-  }
-
+  const all = await getActivityProvider().listYearActivities(year);
   await saveYearActivities(year, all);
   return all;
 }
