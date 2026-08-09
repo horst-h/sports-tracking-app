@@ -9,7 +9,7 @@ type DebugData = {
   year: number;
   mode: ForecastMode;
   dashboard?: YearDashboard;
-  tokenInfo?: { hasToken: boolean; expiresAt?: number };
+  tokenInfo?: { hasToken: boolean; expiresAt?: number; scope?: string; hasActivityRead?: boolean | null };
 };
 
 function nowLocalString() {
@@ -41,7 +41,12 @@ export default function DebugPanel() {
     const t = await loadToken();
     setData((d) => ({
       ...d,
-      tokenInfo: { hasToken: !!t, expiresAt: t?.expires_at },
+      tokenInfo: {
+        hasToken: !!t,
+        expiresAt: t?.expires_at,
+        scope: t?.scope ?? "(unknown - log in again to record it)",
+        hasActivityRead: t?.scope?.includes("activity:read") ?? null,
+      },
     }));
   }
 
@@ -184,7 +189,10 @@ export default function DebugPanel() {
 
             <div style={{ opacity: 0.85 }}>
               Token:{" "}
-              {data.tokenInfo?.hasToken ? `present (expires_at=${data.tokenInfo.expiresAt})` : "none"}
+              {data.tokenInfo?.hasToken
+                ? `present (expires_at=${data.tokenInfo.expiresAt}) scope=${data.tokenInfo.scope}`
+                  + (data.tokenInfo.hasActivityRead === false ? " -- MISSING activity:read_all" : "")
+                : "none"}
             </div>
 
             <details>

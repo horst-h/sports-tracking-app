@@ -9,6 +9,7 @@ type StravaTokenResponse = {
   expires_at: number;
   expires_in: number;
   refresh_token: string;
+  scope?: string;
   athlete: unknown;
 };
 
@@ -62,11 +63,14 @@ export async function handler(event: any) {
 
     const tokenJson = (await tokenRes.json()) as StravaTokenResponse;
 
-    // Return token to browser
+    // Return token to browser. `scope` is passed through deliberately: without
+    // it the client cannot distinguish "not logged in" from "logged in but
+    // missing activity:read_all", which look identical from the UI.
     return json(200, {
       access_token: tokenJson.access_token,
       refresh_token: tokenJson.refresh_token,
       expires_at: tokenJson.expires_at,
+      scope: tokenJson.scope,
     });
   } catch (e: any) {
     console.error("[exchange-code] Error:", e);

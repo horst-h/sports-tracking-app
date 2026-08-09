@@ -1,6 +1,7 @@
 import type { Activity } from "../../domain/activity";
 import type { SportType } from "../../domain/sport";
 import type { StravaActivity } from "./stravaTypes";
+import { stripZoneSuffix, toLocalWallClock } from "../../utils/localTime";
 
 /** Activities the app does not track, kept so they can be reported rather than vanishing. */
 export type SkippedActivity = { id: string; type: string };
@@ -17,28 +18,6 @@ function mapSport(stravaType: string): SportType | null {
   if (t === "ride") return "ride";
   if (t.includes("swim")) return "swim";
   return null;
-}
-
-/**
- * Strava sends `start_date_local` with a trailing "Z" although the value is
- * local wall-clock time, not UTC. Left in place, every downstream Date parse
- * shifts the activity by the viewer's UTC offset — which is how a late run on
- * 31 December can land in the following year's goal.
- */
-function stripZoneSuffix(iso: string): string {
-  return iso.replace(/(?:Z|[+-]\d{2}:?\d{2})$/, "");
-}
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-/** Formats an instant as local wall-clock time, matching Activity.startDateLocal. */
-function toLocalWallClock(d: Date): string {
-  return (
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
-    `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-  );
 }
 
 function resolveStartDateLocal(a: StravaActivity): string {
