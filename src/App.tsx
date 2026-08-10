@@ -94,6 +94,8 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const year = new Date().getFullYear();
   const [goals, setGoals] = useState<YearGoals>(emptyGoals(year));
+  /** Bumped by the pull-to-refresh, mirroring how useActivities re-runs. */
+  const [goalsRefreshTrigger, setGoalsRefreshTrigger] = useState(0);
 
   // Auth check (MUST be before conditional return)
   const { ready, needsLogin, signIn, signOut } = useDataAccess();
@@ -126,11 +128,16 @@ export default function App() {
   // activities (MUST be before conditional return)
   const { activities, loading, refreshing, error, lastSync, refetch } = useActivities(year, ready);
 
-  // Load goals whenever the year changes, the drawer closes after a save, or
-  // the athlete signs in. That last one is not optional: before sign-in this
-  // can only answer from the local cache, so on a device that has never held
-  // these goals it returns nothing — and without `ready` in the dependencies
-  // it would never ask again.
+  // Load goals whenever the year changes, the drawer closes after a save, the
+  // athlete signs in, or they pull to refresh.
+  //
+  // Sign-in is not optional here: before it, this can only answer from the
+  // local cache, so on a device that has never held these goals it returns
+  // nothing — and without `ready` in the dependencies it would never ask again.
+  //
+  // Neither is the refresh. Pulling down is how someone says "fetch what I am
+  // missing", and answering that with activities alone left a goal set on
+  // another device invisible until the screen happened to remount.
   useEffect(() => {
     if (!ready) return;
 
@@ -147,7 +154,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [year, settingsOpen, ready]);
+  }, [year, settingsOpen, ready, goalsRefreshTrigger]);
 
   // optional: later expose in UI
   const mode: ForecastMode = "ytd";
@@ -239,6 +246,7 @@ export default function App() {
   }
 
   async function handleRefresh() {
+    setGoalsRefreshTrigger((n) => n + 1);
     await refetch();
   }
 
