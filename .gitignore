@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 .netlify/
 .env
+
+# Spike artifacts contain personal activity data
+spike-output/

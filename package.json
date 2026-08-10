@@ -12,7 +12,8 @@
     "smoke": "tsx src/domain/metrics/smoke.ts",
     "test": "TZ=Europe/Berlin vitest run",
     "test:watch": "TZ=Europe/Berlin vitest",
-    "setup:pwa-icons": "node scripts/setup-pwa-icons.mjs"
+    "setup:pwa-icons": "node scripts/setup-pwa-icons.mjs",
+    "spike:runalyze": "tsx scripts/runalyze-spike.ts"
   },
   "dependencies": {
     "@netlify/blobs": "^10.7.0",
