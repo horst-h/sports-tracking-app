@@ -59,7 +59,7 @@ export default function GoalsPage() {
 
   const year = new Date().getFullYear();
   const { ready } = useDataAccess();
-  const { goals, loading: goalsLoading } = useGoals(year);
+  const { goals, loading: goalsLoading } = useGoals(year, ready);
   const { activities, loading: activitiesLoading } = useActivities(year, ready);
   const pendingSaveRef = useRef<Promise<void> | null>(null);
   const [goalOverridesBySport, setGoalOverridesBySport] = useState<

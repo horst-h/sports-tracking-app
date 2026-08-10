@@ -65,7 +65,7 @@ export default function AnalyzePage() {
   const enabled = ready && routeOk;
   const { activities, loading: activitiesLoading } = useActivities(year, enabled);
   useAthlete(enabled); // Ensure athlete is loaded but not directly used
-  const { goals } = useGoals(year);
+  const { goals } = useGoals(year, ready);
 
   // Build UI stats with same logic as App.tsx
   const uiStats = useMemo(() => {

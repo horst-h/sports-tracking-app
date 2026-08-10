@@ -126,8 +126,14 @@ export default function App() {
   // activities (MUST be before conditional return)
   const { activities, loading, refreshing, error, lastSync, refetch } = useActivities(year, ready);
 
-  // load goals whenever year changes OR drawer closes (after saving)
+  // Load goals whenever the year changes, the drawer closes after a save, or
+  // the athlete signs in. That last one is not optional: before sign-in this
+  // can only answer from the local cache, so on a device that has never held
+  // these goals it returns nothing — and without `ready` in the dependencies
+  // it would never ask again.
   useEffect(() => {
+    if (!ready) return;
+
     let cancelled = false;
 
     (async () => {
@@ -138,7 +144,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [year, settingsOpen]);
+  }, [year, settingsOpen, ready]);
 
   // optional: later expose in UI
   const mode: ForecastMode = "ytd";

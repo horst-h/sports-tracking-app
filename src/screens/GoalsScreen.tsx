@@ -58,7 +58,7 @@ export default function GoalsScreen() {
   
   const [selectedSport, setSelectedSport] = useState<Sport>("run");
   
-  const { goals, loading: goalsLoading } = useGoals(year);
+  const { goals, loading: goalsLoading } = useGoals(year, ready);
   const { activities, loading: activitiesLoading } = useActivities(year, ready);
   const pendingSaveRef = useRef<Promise<void> | null>(null);
   const [goalOverridesBySport, setGoalOverridesBySport] = useState<
