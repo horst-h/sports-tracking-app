@@ -1,4 +1,5 @@
 import type { Handler } from "@netlify/functions";
+import { requireIdentity } from "./_lib/identity";
 
 type CoachInput = {
   year: number;
@@ -236,6 +237,12 @@ function buildMultiCategoryPrompt(input: MultiCategoryCoachInput): { system: str
 
 export const handler: Handler = async (event) => {
   try {
+    const auth = await requireIdentity(event.headers);
+    if (!auth.ok) {
+      console.warn(`[goalCoach] Rejected: ${auth.error}`);
+      return { statusCode: auth.status, body: JSON.stringify({ error: auth.error }) };
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return { statusCode: 500, body: "Missing OPENAI_API_KEY" };

@@ -1,11 +1,18 @@
 // AI Serverless Function - Proxy for AI requests (optional)
 import type { Handler } from "@netlify/functions";
+import { requireIdentity } from "./_lib/identity";
 
 // PSEUDO: implement provider of your choice.
 // Keep prompt-only. Don't log user data.
 
 export const handler: Handler = async (event) => {
   try {
+    const auth = await requireIdentity(event.headers);
+    if (!auth.ok) {
+      console.warn(`[ai] Rejected: ${auth.error}`);
+      return { statusCode: auth.status, body: JSON.stringify({ error: auth.error }) };
+    }
+
     const body = JSON.parse(event.body || "{}");
     const prompt = body.prompt;
     if (!prompt) return { statusCode: 400, body: "Missing prompt" };

@@ -1,4 +1,5 @@
 import type { Handler } from "@netlify/functions";
+import { requireIdentity } from "./_lib/identity";
 
 type AnalyzeFacts = {
   sport: "run" | "ride";
@@ -85,6 +86,12 @@ function toneTag(f: AnalyzeFacts): AnalyzeNarrative["toneTag"] {
 
 export const handler: Handler = async (event) => {
   try {
+    const auth = await requireIdentity(event.headers);
+    if (!auth.ok) {
+      console.warn(`[analyzeNarrative] Rejected: ${auth.error}`);
+      return { statusCode: auth.status, body: JSON.stringify({ error: auth.error }) };
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       console.log("[DEBUG] OPENAI_API_KEY missing");
