@@ -26,8 +26,22 @@
  *   RUNALYZE_API_TOKEN=xxxx npm run spike:runalyze -- --max-pages 2
  */
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
+
+/**
+ * Load .env if present, so the token can live next to the other local
+ * secrets instead of having to be exported in every shell. Node's own
+ * loader; no dependency. Real environment variables still win, which is
+ * what CI and `netlify dev` rely on.
+ */
+if (existsSync(".env")) {
+  try {
+    process.loadEnvFile(".env");
+  } catch {
+    /* a malformed .env should not stop the spike from running */
+  }
+}
 
 const BASE = "https://runalyze.com/api/v1";
 const OUT_DIR = "spike-output";
@@ -81,7 +95,9 @@ if (!token) {
   console.error("Create a token at https://runalyze.com/settings/personal-api");
   console.error("Make sure you tick the READ scopes — a write-only token authenticates");
   console.error("fine but returns nothing, which looks exactly like an empty account.\n");
-  console.error("Then:  RUNALYZE_API_TOKEN=xxxx npm run spike:runalyze\n");
+  console.error("Then either export it, or add this line to .env (gitignored):");
+  console.error("  RUNALYZE_API_TOKEN=xxxx");
+  console.error("\nDo NOT prefix it with VITE_ — Vite inlines those into the browser bundle.\n");
   process.exit(1);
 }
 
