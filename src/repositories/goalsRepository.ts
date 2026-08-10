@@ -4,21 +4,48 @@ import { authHeader } from "./googleSessionRepository.ts";
 
 const STORE = "goals";
 
-type GoalsDocV1 = {
-  schemaVersion: 1;
+/**
+ * Every sport the app can set a goal for is synced.
+ *
+ * Leaving one out does not make it "local by design" — it makes it invisible on
+ * every other device, which is exactly what happened to swimming while this
+ * list said `["run", "ride"]`.
+ */
+const SPORTS: Sport[] = ["run", "ride", "swim"];
+const METRICS: GoalMetric[] = ["count", "distanceKm", "elevationM"];
+
+type GoalData = Partial<Record<GoalMetric, number>>;
+
+/**
+ * What this device believes the backend holds for one sport.
+ *
+ * `syncedAt` is the backend record's own `updatedAt` as we last saw it, so any
+ * write from another device shows up here as a mismatch. Tracking it per sport
+ * is the whole point: the previous format kept one number for the entire year —
+ * the highest version across all sports — so a change to a sport that happened
+ * to sit at a lower version never registered as new, and that device stayed
+ * wrong forever.
+ */
+type SportSync = {
+  syncedAt?: string;
+  /** A local edit that never reached the backend. Retried on the next load. */
+  dirty?: boolean;
+};
+
+type SyncState = Partial<Record<Sport, SportSync>>;
+
+type GoalsDocV2 = {
+  schemaVersion: 2;
   year: number;
   goals: YearGoals;
-  updatedAt: string; // ISO
-  version?: number;  // from backend
+  /** When this device last wrote the document. Diagnostics only. */
+  updatedAt: string;
+  sync: SyncState;
 };
 
-type RemoteGoalData = {
-  distanceKm?: number;
-  count?: number;
-  elevationM?: number;
-};
+type CachedGoals = { goals: YearGoals; sync: SyncState };
 
-type RemoteGoal = RemoteGoalData & {
+type RemoteGoal = GoalData & {
   /** "google:<sub>" — replaced the Strava athlete id when identity moved. */
   subject: string;
   year: number;
@@ -28,12 +55,39 @@ type RemoteGoal = RemoteGoalData & {
   version: number;
 };
 
+/**
+ * A backend answer, with "the backend says there is no goal" kept apart from
+ * "we could not ask". Collapsing the two into `null` is how a flight-mode phone
+ * would end up deleting goals that are perfectly fine on the server.
+ */
+type FetchResult = { ok: true; goal: RemoteGoal | null } | { ok: false };
+
 function nowIso() {
   return new Date().toISOString();
 }
 
 function isFiniteNonNegNumber(x: unknown): x is number {
   return typeof x === "number" && Number.isFinite(x) && x >= 0;
+}
+
+function emptyYearGoals(year: number): YearGoals {
+  return { year, perSport: { run: {}, ride: {}, swim: {} } };
+}
+
+function hasValues(data: GoalData | undefined): boolean {
+  return !!data && METRICS.some((m) => data[m] !== undefined);
+}
+
+function sameGoalData(a: GoalData | undefined, b: GoalData | undefined): boolean {
+  return METRICS.every((m) => (a?.[m] ?? null) === (b?.[m] ?? null));
+}
+
+function goalDataOf(remote: RemoteGoal): GoalData {
+  const data: GoalData = {};
+  for (const m of METRICS) {
+    if (isFiniteNonNegNumber(remote[m])) data[m] = remote[m];
+  }
+  return data;
 }
 
 function normalizeYearGoals(year: number, input: YearGoals): YearGoals {
@@ -49,13 +103,10 @@ function normalizeYearGoals(year: number, input: YearGoals): YearGoals {
   };
 
   // Clean invalid metric values
-  const sports: Sport[] = ["run", "ride", "swim"];
-  const metrics: GoalMetric[] = ["count", "distanceKm", "elevationM"];
-
-  for (const s of sports) {
-    const cleaned: Partial<Record<GoalMetric, number>> = {};
-    for (const m of metrics) {
-      const v = (normalized.perSport[s] as any)?.[m];
+  for (const s of SPORTS) {
+    const cleaned: GoalData = {};
+    for (const m of METRICS) {
+      const v = (normalized.perSport[s] as GoalData | undefined)?.[m];
       if (isFiniteNonNegNumber(v)) cleaned[m] = v;
     }
     normalized.perSport[s] = cleaned;
@@ -64,30 +115,50 @@ function normalizeYearGoals(year: number, input: YearGoals): YearGoals {
   return normalized;
 }
 
-function wrapDoc(year: number, goals: YearGoals, version?: number): GoalsDocV1 {
+function wrapDoc(year: number, goals: YearGoals, sync: SyncState): GoalsDocV2 {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     year,
     goals: normalizeYearGoals(year, goals),
     updatedAt: nowIso(),
-    version,
+    sync,
   };
 }
 
-function unwrapDoc(year: number, raw: any): YearGoals | null {
-  if (!raw) return null;
+function unwrapDoc(year: number, raw: unknown): CachedGoals | null {
+  if (!raw || typeof raw !== "object") return null;
 
-  // Backward compatibility: older versions stored YearGoals directly
-  if (raw?.perSport && typeof raw?.year === "number") {
-    return normalizeYearGoals(year, raw as YearGoals);
+  // Every shape this store has ever held, seen through one lens: the current
+  // document, the v1 document, and the bare YearGoals that predates both.
+  const doc = raw as Partial<Omit<GoalsDocV2, "schemaVersion">> & {
+    schemaVersion?: number;
+    perSport?: unknown;
+  };
+
+  if (doc.schemaVersion === 2 && doc.goals) {
+    return { goals: normalizeYearGoals(year, doc.goals), sync: doc.sync ?? {} };
   }
 
-  // Current format
-  if (raw?.schemaVersion === 1 && raw?.goals) {
-    return normalizeYearGoals(year, raw.goals as YearGoals);
-  }
+  // v1 carried a single version number for the whole year, and builds before it
+  // stored a bare YearGoals. Neither records which sports the backend has ever
+  // seen, so every sport holding a value is treated as an unpushed local edit:
+  // the first revalidation either finds a newer record on the backend and takes
+  // it, or uploads what is here. Assuming "already synced" would instead throw
+  // away goals this device never managed to send — swimming, most of all.
+  const legacy: YearGoals | null =
+    doc.schemaVersion === 1 && doc.goals
+      ? doc.goals
+      : doc.perSport && typeof doc.year === "number"
+        ? (raw as YearGoals)
+        : null;
+  if (!legacy) return null;
 
-  return null;
+  const goals = normalizeYearGoals(year, legacy);
+  const sync: SyncState = {};
+  for (const sport of SPORTS) {
+    if (hasValues(goals.perSport[sport])) sync[sport] = { dirty: true };
+  }
+  return { goals, sync };
 }
 
 // ========== Backend API Integration ==========
@@ -96,312 +167,298 @@ const API_BASE = "/.netlify/functions/goals";
 
 /**
  * The goals API authenticates with the app's own Google session, not with the
- * activity source. Returns null when there is none, and every caller below
- * treats that as "stay local" rather than as an error — goals are always
- * written to the cache first, so an unauthenticated session still works,
- * only without sync.
+ * activity source. Without one the app still works entirely from the local
+ * cache — it just does not sync, and nothing local is ever discarded on the
+ * strength of an answer we could not obtain.
  */
 async function getAuthHeader(): Promise<{ Authorization: string } | null> {
   return authHeader();
 }
 
-/**
- * Fetch goal from backend API for a specific sport.
- */
-async function fetchGoalFromBackend(year: number, sport: Sport): Promise<RemoteGoal | null> {
+async function fetchGoalFromBackend(year: number, sport: Sport): Promise<FetchResult> {
   const auth = await getAuthHeader();
-  if (!auth) {
-    console.warn(`[GoalsRepository] Not signed in; skipping backend fetch (${year}/${sport})`);
-    return null;
-  }
+  if (!auth) return { ok: false };
 
   try {
-    const url = `${API_BASE}?year=${year}&sport=${sport}`;
-    console.info(`[GoalsRepository] Fetching goal from backend: ${url}`);
-    const response = await fetch(url, { headers: auth });
+    const response = await fetch(`${API_BASE}?year=${year}&sport=${sport}`, { headers: auth });
 
     if (!response.ok) {
-      console.warn(`[GoalsRepository] Failed to fetch goal (${year}/${sport}): HTTP ${response.status}`);
-      return null;
+      console.warn(`[GoalsRepository] Fetch failed (${year}/${sport}): HTTP ${response.status}`);
+      return { ok: false };
     }
 
     const data = await response.json();
-    const goal = data.goal ?? null;
-    console.info(`[GoalsRepository] Fetched goal (${year}/${sport}):`, goal);
-    return goal;
+    return { ok: true, goal: (data.goal as RemoteGoal | null) ?? null };
   } catch (error) {
-    console.error(`[GoalsRepository] Error fetching goal (${year}/${sport}):`, error);
-    return null;
+    console.error(`[GoalsRepository] Fetch error (${year}/${sport}):`, error);
+    return { ok: false };
   }
 }
 
-/**
- * Save goal to backend API for a specific sport.
- */
 async function saveGoalToBackend(
   year: number,
   sport: Sport,
-  goalData: RemoteGoalData
+  goalData: GoalData
 ): Promise<RemoteGoal | null> {
   const auth = await getAuthHeader();
-  if (!auth) {
-    console.warn(`[GoalsRepository] Not signed in; goal stays local (${year}/${sport})`);
-    return null;
-  }
+  if (!auth) return null;
 
   try {
-    console.info(`[GoalsRepository] Saving goal to backend (${year}/${sport}):`, goalData);
     const response = await fetch(API_BASE, {
       method: "PUT",
       headers: { ...auth, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        year,
-        sport,
-        ...goalData,
-      }),
+      body: JSON.stringify({ year, sport, ...goalData }),
     });
 
     if (!response.ok) {
-      console.error(`[GoalsRepository] Failed to save goal (${year}/${sport}): HTTP ${response.status}`);
+      console.error(`[GoalsRepository] Save failed (${year}/${sport}): HTTP ${response.status}`);
       return null;
     }
 
     const data = await response.json();
-    const savedGoal = data.goal ?? null;
-    console.info(`[GoalsRepository] Goal saved successfully (${year}/${sport}):`, savedGoal);
-    return savedGoal;
+    return (data.goal as RemoteGoal | null) ?? null;
   } catch (error) {
-    console.error(`[GoalsRepository] Error saving goal (${year}/${sport}):`, error);
+    console.error(`[GoalsRepository] Save error (${year}/${sport}):`, error);
     return null;
   }
 }
 
-/**
- * Delete goal from backend API for a specific sport.
- */
 async function deleteGoalFromBackend(year: number, sport: Sport): Promise<boolean> {
   const auth = await getAuthHeader();
-  if (!auth) {
-    console.warn(`[GoalsRepository] Not signed in; skipping backend delete (${year}/${sport})`);
-    return false;
-  }
+  if (!auth) return false;
 
   try {
-    const url = `${API_BASE}?year=${year}&sport=${sport}`;
-    console.info(`[GoalsRepository] Deleting goal from backend: ${url}`);
-    const response = await fetch(url, { method: "DELETE", headers: auth });
+    const response = await fetch(`${API_BASE}?year=${year}&sport=${sport}`, {
+      method: "DELETE",
+      headers: auth,
+    });
 
     if (!response.ok) {
-      console.error(`[GoalsRepository] Failed to delete goal (${year}/${sport}): HTTP ${response.status}`);
+      console.error(`[GoalsRepository] Delete failed (${year}/${sport}): HTTP ${response.status}`);
       return false;
     }
 
     const data = await response.json();
-    const success = data.ok ?? false;
-    console.info(`[GoalsRepository] Goal deleted (${year}/${sport}):`, success);
-    return success;
+    return data.ok ?? false;
   } catch (error) {
-    console.error(`[GoalsRepository] Error deleting goal (${year}/${sport}):`, error);
+    console.error(`[GoalsRepository] Delete error (${year}/${sport}):`, error);
     return false;
   }
 }
 
 /**
- * Convert RemoteGoal array to YearGoals structure.
+ * Writes one sport to the backend, where an empty goal means deletion.
+ *
+ * Clearing the last metric of a sport used to send nothing at all, which left
+ * the old record standing on the server — the other device kept showing a goal
+ * that had been deleted, and this one got it back on the next cache miss.
+ *
+ * Returns the new sync state, or null when the write did not go through.
  */
-function remoteGoalsToYearGoals(year: number, goals: RemoteGoal[]): YearGoals {
-  const yearGoals: YearGoals = {
-    year,
-    perSport: {
-      run: {},
-      ride: {},
-      swim: {},
-    },
-  };
-
-  for (const goal of goals) {
-    if (goal.year === year) {
-      yearGoals.perSport[goal.sport] = {
-        ...(goal.distanceKm !== undefined && { distanceKm: goal.distanceKm }),
-        ...(goal.count !== undefined && { count: goal.count }),
-        ...(goal.elevationM !== undefined && { elevationM: goal.elevationM }),
-      };
-    }
+async function pushSport(year: number, sport: Sport, data: GoalData): Promise<SportSync | null> {
+  if (hasValues(data)) {
+    const saved = await saveGoalToBackend(year, sport, data);
+    return saved ? { syncedAt: saved.updatedAt } : null;
   }
 
-  return yearGoals;
+  const deleted = await deleteGoalFromBackend(year, sport);
+  return deleted ? {} : null;
 }
 
-/**
- * Extract goal data for a specific sport from YearGoals.
- */
-function extractSportGoalData(goals: YearGoals, sport: Sport): RemoteGoalData {
-  return goals.perSport[sport] ?? {};
-}
+// ========== Local cache ==========
 
-/**
- * Save to local cache.
- */
-async function saveToCache(year: number, goals: YearGoals, version?: number): Promise<void> {
+async function saveToCache(year: number, goals: YearGoals, sync: SyncState): Promise<void> {
   const db = await openSportsDB();
-  await db.put(STORE, wrapDoc(year, goals, version), year);
+  await db.put(STORE, wrapDoc(year, goals, sync), year);
 }
 
-/**
- * Load from local cache.
- */
-async function loadFromCache(year: number): Promise<{ goals: YearGoals; version?: number } | null> {
+async function loadFromCache(year: number): Promise<CachedGoals | null> {
   const db = await openSportsDB();
-  const raw = await db.get(STORE, year);
-  const goals = unwrapDoc(year, raw);
-  if (!goals) return null;
-  
-  const version = raw?.version;
-  return { goals, version };
+  return unwrapDoc(year, await db.get(STORE, year));
 }
 
-/**
- * Delete from local cache.
- */
 async function deleteFromCache(year: number): Promise<void> {
   const db = await openSportsDB();
   await db.delete(STORE, year);
 }
 
+// ========== Sync ==========
+
+type Revalidation = {
+  goals: YearGoals | null;
+  /** True when the visible goals differ from what the caller was handed. */
+  changed: boolean;
+};
+
 /**
- * Save yearly training goals for a specific year.
- * Overrides any existing goals for that year.
- * Syncs with backend if authenticated, otherwise saves locally only.
+ * Reconciles one year with the backend, sport by sport.
+ *
+ * Each sport is decided on its own, because that is the granularity the backend
+ * stores at. A sport is only touched when the backend actually answered for it;
+ * silence leaves the local copy exactly as it is.
  */
-export async function saveGoals(year: number, goals: YearGoals): Promise<void> {
-  console.info(`[GoalsRepository] saveGoals() called for year ${year}:`, goals);
-  
-  const normalizedGoals = normalizeYearGoals(year, goals);
-  
-  // Try to sync with backend
-  const sports: Sport[] = ["run", "ride"];
-  const remoteGoals: RemoteGoal[] = [];
-  
-  for (const sport of sports) {
-    const sportData = extractSportGoalData(normalizedGoals, sport);
-    
-    // Only save if there's some data
-    if (Object.keys(sportData).length > 0) {
-      console.info(`[GoalsRepository] Attempting to save ${sport} goal to backend`);
-      const saved = await saveGoalToBackend(year, sport, sportData);
-      if (saved) {
-        console.info(`[GoalsRepository] ✅ Successfully saved ${sport} goal to backend`);
-        remoteGoals.push(saved);
-      } else {
-        console.warn(`[GoalsRepository] ⚠️ Failed to save ${sport} goal to backend`);
+async function revalidate(year: number, cached: CachedGoals | null): Promise<Revalidation> {
+  const merged = normalizeYearGoals(year, cached?.goals ?? emptyYearGoals(year));
+  const sync: SyncState = { ...(cached?.sync ?? {}) };
+  let changed = false;
+  let touchedSyncState = false;
+
+  const answers = await Promise.all(SPORTS.map((sport) => fetchGoalFromBackend(year, sport)));
+
+  for (const [index, sport] of SPORTS.entries()) {
+    const answer = answers[index];
+    if (!answer.ok) continue; // offline, signed out, or the call failed — leave it alone
+
+    const remote = answer.goal;
+    const state = sync[sport] ?? {};
+    const remoteMoved = !!remote && remote.updatedAt !== state.syncedAt;
+
+    // An edit that never left this device, and nobody else has written since:
+    // send it now rather than letting it sit here looking synced.
+    if (state.dirty && !remoteMoved) {
+      const pushed = await pushSport(year, sport, merged.perSport[sport]);
+      if (pushed) {
+        sync[sport] = pushed;
+        touchedSyncState = true;
+        console.info(`[GoalsRepository] Pushed pending ${sport} goal for ${year}`);
       }
+      continue;
+    }
+
+    if (remoteMoved) {
+      // Written elsewhere after we last looked, so it wins — including over a
+      // local edit that never made it out, which would otherwise resurrect an
+      // older value on every device it touches.
+      if (state.dirty) {
+        console.warn(`[GoalsRepository] Dropping unpushed ${sport} edit; backend is newer`);
+      }
+      const values = goalDataOf(remote!);
+      if (!sameGoalData(merged.perSport[sport], values)) {
+        merged.perSport[sport] = values;
+        changed = true;
+      }
+      sync[sport] = { syncedAt: remote!.updatedAt };
+      touchedSyncState = true;
+      continue;
+    }
+
+    if (!remote && state.syncedAt) {
+      // We had agreed on a record and it is gone: deleted on another device.
+      if (hasValues(merged.perSport[sport])) {
+        merged.perSport[sport] = {};
+        changed = true;
+      }
+      sync[sport] = {};
+      touchedSyncState = true;
     }
   }
-  
-  // Determine version from backend response
-  const maxVersion = remoteGoals.length > 0
-    ? Math.max(...remoteGoals.map(g => g.version))
-    : undefined;
-  
-  console.info(`[GoalsRepository] Synced ${remoteGoals.length} goals to backend, maxVersion: ${maxVersion}`);
-  
-  // Always save to local cache
-  await saveToCache(year, normalizedGoals, maxVersion);
-  console.info(`[GoalsRepository] ✅ Goals saved to local cache`);
+
+  const anyGoals = SPORTS.some((sport) => hasValues(merged.perSport[sport]));
+
+  // Nothing here and nothing there: do not create a cache entry, or every year
+  // ever opened would start showing up in listGoalYears().
+  if (!cached && !anyGoals) return { goals: null, changed: false };
+
+  if (changed || touchedSyncState || !cached) {
+    await saveToCache(year, merged, sync);
+  }
+
+  return { goals: merged, changed };
+}
+
+// ========== Public API ==========
+
+export type SaveGoalsResult = {
+  /** False when at least one sport stayed on this device. It is retried on the
+   *  next load, but until then the other devices do not have it. */
+  synced: boolean;
+};
+
+/**
+ * Save yearly training goals for a specific year.
+ * Writes through to the backend where possible, and always to the local cache.
+ */
+export async function saveGoals(year: number, goals: YearGoals): Promise<SaveGoalsResult> {
+  const next = normalizeYearGoals(year, goals);
+  const cached = await loadFromCache(year);
+  const sync: SyncState = { ...(cached?.sync ?? {}) };
+  let synced = true;
+
+  for (const sport of SPORTS) {
+    const previous = cached?.goals.perSport[sport];
+    const current = next.perSport[sport];
+    const state = sync[sport] ?? {};
+
+    // Untouched sports are left alone. Re-sending them would bump the backend's
+    // timestamp for nothing and make every other device re-adopt values it
+    // already has.
+    if (sameGoalData(previous, current) && !state.dirty) continue;
+
+    const pushed = await pushSport(year, sport, current);
+    if (pushed) {
+      sync[sport] = pushed;
+    } else {
+      sync[sport] = { ...state, dirty: true };
+      synced = false;
+    }
+  }
+
+  await saveToCache(year, next, sync);
+  return { synced };
 }
 
 /**
  * Load yearly training goals for a specific year.
  * Returns null if no goals have been set for that year.
- * Uses stale-while-revalidate strategy: returns cache immediately,
- * then fetches from backend and updates if newer.
+ *
+ * Cache first, backend behind it. `onRevalidated` is how the fresher answer
+ * reaches the screen: without it the background sync would quietly update
+ * IndexedDB while the UI kept rendering the copy it was handed, and the change
+ * would only appear on the next reload.
  */
-export async function loadGoals(year: number): Promise<YearGoals | null> {
-  console.info(`[GoalsRepository] loadGoals() called for year ${year}`);
-  
-  // Load from cache immediately
+export async function loadGoals(
+  year: number,
+  onRevalidated?: (goals: YearGoals | null) => void
+): Promise<YearGoals | null> {
   const cached = await loadFromCache(year);
-  console.info(`[GoalsRepository] Loaded from local cache:`, cached);
-  
-  // Try to fetch from backend in background
-  const sports: Sport[] = ["run", "ride"];
-  const fetchPromises = sports.map(sport => fetchGoalFromBackend(year, sport));
 
-  // If cache is empty, wait for backend once so users immediately see existing goals.
+  // With nothing to show, waiting for the backend beats rendering an empty year
+  // — this is a device that has never held these goals.
   if (!cached) {
     try {
-      const remoteGoals = await Promise.all(fetchPromises);
-      const validGoals = remoteGoals.filter((g): g is RemoteGoal => g !== null);
-
-      if (validGoals.length > 0) {
-        const maxVersion = Math.max(...validGoals.map(g => g.version));
-        const yearGoals = remoteGoalsToYearGoals(year, validGoals);
-        await saveToCache(year, yearGoals, maxVersion);
-        console.info(`[GoalsRepository] Cache miss resolved from backend with ${validGoals.length} goals`);
-        return yearGoals;
-      }
+      const result = await revalidate(year, null);
+      return result.goals;
     } catch (error) {
-      console.error(`[GoalsRepository] Cache miss backend fetch failed:`, error);
+      console.error(`[GoalsRepository] Initial load failed for ${year}:`, error);
+      return null;
     }
-
-    return null;
   }
 
-  // With cached data, keep stale-while-revalidate behavior.
-  const cacheResult = cached?.goals ?? null;
-  console.info(`[GoalsRepository] Returning immediately with cache result`);
-  
-  // Background revalidation
-  Promise.all(fetchPromises).then(async (remoteGoals) => {
-    const validGoals = remoteGoals.filter((g): g is RemoteGoal => g !== null);
-    
-    if (validGoals.length === 0) {
-      console.info(`[GoalsRepository] No backend goals found for year ${year}`);
-      return;
-    }
-    
-    console.info(`[GoalsRepository] Background sync: received ${validGoals.length} goals from backend`);
-    
-    const maxVersion = Math.max(...validGoals.map(g => g.version));
-    const cachedVersion = cached?.version ?? 0;
-    
-    console.info(`[GoalsRepository] Version check - Backend: ${maxVersion}, Cache: ${cachedVersion}`);
-    
-    // Only update if backend is newer
-    if (maxVersion > cachedVersion) {
-      console.info(`[GoalsRepository] ✅ Backend is newer, updating cache`);
-      const yearGoals = remoteGoalsToYearGoals(year, validGoals);
-      await saveToCache(year, yearGoals, maxVersion);
-    } else {
-      console.info(`[GoalsRepository] Cache is up-to-date, no update needed`);
-    }
-  }).catch((error) => {
-    console.error(`[GoalsRepository] Background sync error:`, error);
-  });
-  
-  return cacheResult;
+  revalidate(year, cached)
+    .then((result) => {
+      if (result.changed) onRevalidated?.(result.goals);
+    })
+    .catch((error) => {
+      console.error(`[GoalsRepository] Background sync failed for ${year}:`, error);
+    });
+
+  return cached.goals;
 }
 
 /**
- * Delete yearly training goals for a specific year.
- * Deletes from both backend and local cache.
+ * Delete yearly training goals for a specific year, backend and cache alike.
+ *
+ * A backend deletion that fails is not silently absorbed: the local entry goes
+ * either way, so the next load finds the surviving record and adopts it back.
  */
 export async function deleteGoals(year: number): Promise<void> {
-  console.info(`[GoalsRepository] deleteGoals() called for year ${year}`);
-  
-  // Try to delete from backend
-  const sports: Sport[] = ["run", "ride"];
-  const deletePromises = sports.map(sport => {
-    console.info(`[GoalsRepository] Deleting ${sport} goal from backend`);
-    return deleteGoalFromBackend(year, sport);
-  });
-  
-  const results = await Promise.all(deletePromises);
-  console.info(`[GoalsRepository] Backend deletions: ${results.filter(Boolean).length}/${results.length} successful`);
-  
-  // Always delete from cache
+  const results = await Promise.all(SPORTS.map((sport) => deleteGoalFromBackend(year, sport)));
+  const failed = results.filter((ok) => !ok).length;
+  if (failed > 0) {
+    console.warn(`[GoalsRepository] ${failed} backend deletion(s) failed for ${year}`);
+  }
+
   await deleteFromCache(year);
-  console.info(`[GoalsRepository] ✅ Goals deleted from local cache`);
 }
 
 /**
@@ -409,14 +466,7 @@ export async function deleteGoals(year: number): Promise<void> {
  * Useful for dashboard or goal management screens.
  */
 export async function getAllGoals(): Promise<YearGoals[]> {
-  const db = await openSportsDB();
-  const keys = await db.getAllKeys(STORE);
-
-  const years = keys
-    .map((k) => Number(k))
-    .filter((n) => Number.isInteger(n))
-    .sort((a, b) => a - b);
-
+  const years = await listGoalYears();
   const all = await Promise.all(years.map((y) => loadGoals(y)));
   return all.filter((g): g is YearGoals => !!g);
 }

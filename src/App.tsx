@@ -137,7 +137,10 @@ export default function App() {
     let cancelled = false;
 
     (async () => {
-      const loaded = await goalsRepo.loadGoals(year);
+      const loaded = await goalsRepo.loadGoals(year, (fresh) => {
+        // The cache answers first; this is the backend catching up afterwards.
+        if (!cancelled) setGoals(fresh ?? emptyGoals(year));
+      });
       if (!cancelled) setGoals(loaded ?? emptyGoals(year));
     })();
 

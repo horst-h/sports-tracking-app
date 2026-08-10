@@ -2,7 +2,9 @@
  * Shared types for Goals API
  */
 
-export type Sport = "run" | "ride";
+/** Mirrors the client's SportType. Every sport the UI offers a goal for has to
+ *  be here, or that goal has nowhere to live but the device that set it. */
+export type Sport = "run" | "ride" | "swim";
 
 export interface GoalData {
   distanceKm?: number;

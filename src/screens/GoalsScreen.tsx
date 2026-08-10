@@ -61,6 +61,9 @@ export default function GoalsScreen() {
   const { goals, loading: goalsLoading } = useGoals(year, ready);
   const { activities, loading: activitiesLoading } = useActivities(year, ready);
   const pendingSaveRef = useRef<Promise<void> | null>(null);
+  /** A save that only reached this device. Worth saying out loud — silence here
+   *  reads as "saved everywhere" and is how two devices drift apart unnoticed. */
+  const [savedLocallyOnly, setSavedLocallyOnly] = useState(false);
   const [goalOverridesBySport, setGoalOverridesBySport] = useState<
     Record<Sport, Partial<Record<GoalMetric, number | undefined>>>
   >({ run: {}, ride: {}, swim: {} });
@@ -126,10 +129,12 @@ export default function GoalsScreen() {
     const savePromise = goalsRepo.saveGoals(year, payload);
     const tracked = savePromise.then(() => {});
     pendingSaveRef.current = tracked;
-    await savePromise;
+    const result = await savePromise;
     if (pendingSaveRef.current === tracked) {
       pendingSaveRef.current = null;
     }
+
+    setSavedLocallyOnly(!result.synced);
 
     setGoalOverridesBySport((prev) => {
       const next = { ...prev };
@@ -188,6 +193,17 @@ export default function GoalsScreen() {
         <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
           Set and manage your yearly targets
         </p>
+
+        {savedLocallyOnly && (
+          <p
+            role="status"
+            // Same amber the off-track badges use; there is no token for it.
+            style={{ fontSize: "0.875rem", color: "#92400e", marginTop: "0.5rem" }}
+          >
+            Saved on this device only — not synced yet. It will be sent the next time
+            the app can reach the server while you are signed in.
+          </p>
+        )}
 
         {/* Sport tabs */}
         <div className="history-tabs" style={{ marginTop: "var(--space-4)" }}>

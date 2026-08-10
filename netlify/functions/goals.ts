@@ -3,7 +3,7 @@ import { requireIdentity } from "./_lib/identity";
 import { createGoalsStore } from "./_lib/goalsStore";
 import type { Sport, GoalData, StoredGoal } from "./_lib/types";
 
-const ALLOWED_SPORTS: Sport[] = ["run", "ride"];
+const ALLOWED_SPORTS: Sport[] = ["run", "ride", "swim"];
 
 function json(statusCode: number, body: unknown) {
   return {
