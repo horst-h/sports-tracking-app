@@ -3,8 +3,8 @@
   publish = "dist"
 
 # Ignore these keys from secrets scan:
-# - STRAVA_CLIENT_SECRET (server-side only, not in client bundle)
-# - VITE_STRAVA_CLIENT_ID (public client ID for OAuth, safe to expose)
+# - STRAVA_CLIENT_SECRET / STRAVA_CLIENT_ID (server-side only, still read by
+#   oauth-refresh; nothing Strava reaches the bundle any more)
 # - VITE_GOOGLE_CLIENT_ID / GOOGLE_CLIENT_ID (same value, and an OAuth client ID
 #   is public by design — it ships in the bundle so the sign-in button can work)
 # Without this, Netlify scanner flags them as secrets and blocks the build
@@ -12,7 +12,7 @@
 # RUNALYZE_API_TOKEN is deliberately NOT listed: it must never reach the bundle,
 # so if the scanner ever finds it, the build should fail.
 [build.environment]
-  SECRETS_SCAN_OMIT_KEYS = "STRAVA_CLIENT_SECRET,VITE_STRAVA_CLIENT_ID,STRAVA_CLIENT_ID,OPENAI_API_KEY,VITE_GOOGLE_CLIENT_ID,GOOGLE_CLIENT_ID"
+  SECRETS_SCAN_OMIT_KEYS = "STRAVA_CLIENT_SECRET,STRAVA_CLIENT_ID,OPENAI_API_KEY,VITE_GOOGLE_CLIENT_ID,GOOGLE_CLIENT_ID"
 
 [functions]
   directory = "netlify/functions"
@@ -22,12 +22,6 @@
   command = "npm run dev"
   targetPort = 5173
   port = 8888
-
-# OAuth callback - must be before SPA catch-all
-[[redirects]]
-  from = "/oauth-callback.html"
-  to = "/oauth-callback.html"
-  status = 200
 
 # Vite special paths - must exclude from SPA catch-all
 [[redirects]]
