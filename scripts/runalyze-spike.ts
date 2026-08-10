@@ -157,16 +157,26 @@ function inferDistanceUnit(activities: RawActivity[]) {
 }
 
 /**
- * Works out how date_time and timezone_offset relate.
+ * Establishes how to read date_time.
  *
- * Activities cluster in waking hours. Whichever interpretation puts more
- * starts between 05:00 and 22:00 is the one that means local time.
+ * Measured on a real account, the value is full ISO 8601 *with* an explicit
+ * offset: "2023-03-26T14:56:19+02:00". That makes it unambiguous and removes
+ * the need for any heuristic — the local wall-clock time is literally the
+ * prefix, and the instant is what Date parses. timezone_offset merely
+ * repeats what the suffix already says.
+ *
+ * The daytime histogram below is kept only as a fallback for the case where
+ * a payload arrives without an offset.
  */
+const OFFSET_SUFFIX = /(?:Z|[+-]\d{2}:?\d{2})$/;
+
 function inferTimeSemantics(activities: RawActivity[]) {
   const samples = activities.filter((a) => typeof a.date_time === "string").slice(0, 500);
   if (samples.length === 0) return null;
 
   const offsets = new Set(samples.map((a) => a.timezone_offset as number | null));
+  const withSuffix = samples.filter((a) => OFFSET_SUFFIX.test(a.date_time as string)).length;
+  const selfDescribing = withSuffix === samples.length;
 
   const hourOf = (iso: string, addMinutes: number) => {
     const d = new Date(iso);
@@ -181,22 +191,17 @@ function inferTimeSemantics(activities: RawActivity[]) {
       return h !== null && h >= 5 && h < 22;
     }).length;
 
-  const raw = daytime(false);
-  const shifted = daytime(true);
-
   return {
     parseable: !Number.isNaN(new Date(samples[0].date_time as string).getTime()),
     sampleValues: samples.slice(0, 3).map((a) => String(a.date_time)),
     distinctOffsets: [...offsets].slice(0, 10),
-    daytimeRaw: raw,
-    daytimeWithOffset: shifted,
+    selfDescribing,
+    daytimeRaw: daytime(false),
+    daytimeWithOffset: daytime(true),
     total: samples.length,
-    conclusion:
-      shifted > raw
-        ? "date_time looks like UTC; add timezone_offset to get local time"
-        : raw >= shifted
-          ? "date_time already looks like local time; timezone_offset is informational"
-          : "inconclusive",
+    conclusion: selfDescribing
+      ? "date_time carries its own UTC offset -> startDateLocal = the string minus the suffix, startDateUtc = Date(date_time). timezone_offset is redundant."
+      : "no offset suffix present; falling back to the daytime histogram to decide whether timezone_offset has to be added",
   };
 }
 
@@ -370,12 +375,17 @@ async function main() {
     console.log(`  sample values      : ${time.sampleValues.join("  |  ")}`);
     console.log(`  parses as a Date   : ${time.parseable ? green("yes") : red("no")}`);
     console.log(`  distinct offsets   : ${JSON.stringify(time.distinctOffsets)}`);
-    console.log(
-      `  daytime starts     : raw ${pct(time.daytimeRaw, time.total)} vs with offset ${pct(time.daytimeWithOffset, time.total)}`
-    );
+    console.log(`  offset in the string: ${time.selfDescribing ? green("always") : yellow("not always")}`);
+    if (!time.selfDescribing) {
+      console.log(
+        `  daytime starts     : raw ${pct(time.daytimeRaw, time.total)} vs with offset ${pct(time.daytimeWithOffset, time.total)}`
+      );
+    }
     console.log(`  ${b("conclusion")}: ${time.conclusion}`);
   }
-  const addOffset = !!time && time.daytimeWithOffset > time.daytimeRaw;
+  // Self-describing timestamps: shifting the instant by the offset reproduces
+  // the wall-clock prefix exactly, so both paths agree.
+  const addOffset = !!time && (time.selfDescribing || time.daytimeWithOffset > time.daytimeRaw);
 
   // -- 5. sports inventory -------------------------------------------------
   heading(5, "Sport ids used by THIS account  (there is no endpoint to list them)");
