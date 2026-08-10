@@ -237,10 +237,16 @@ async function probeReadScopes() {
 
   const rows: Array<Record<string, string | number>> = [];
   let ok = 0;
+  let subscriptionConfirmed = false;
 
   for (const [path, label] of endpoints) {
     const res = await get(path);
-    if (res.status === 200) ok++;
+    if (res.status === 200) {
+      ok++;
+      // This endpoint is Supporter/Premium only, so a 200 proves the plan
+      // is active and rules the subscription out as the cause.
+      if (path.startsWith("/statistics/current")) subscriptionConfirmed = true;
+    }
     rows.push({
       endpoint: path.split("?")[0],
       what: label,
@@ -249,7 +255,7 @@ async function probeReadScopes() {
   }
 
   table(rows);
-  return { reachable: ok, total: endpoints.length };
+  return { reachable: ok, total: endpoints.length, subscriptionConfirmed };
 }
 
 // ---------------------------------------------------------------------- main
@@ -288,12 +294,18 @@ async function main() {
       console.log("  the read permissions. Note that tokens issued before the 2025 API refactor");
       console.log("  keep only their original permissions — an existing token cannot gain read");
       console.log("  access, it has to be replaced.");
+    } else if (scopes.subscriptionConfirmed) {
+      console.log(green("\n  /statistics/current answered 200. That endpoint is Supporter/Premium"));
+      console.log(green("  only, so the subscription is active and is NOT the cause."));
+      console.log(yellow(`\n  ${scopes.reachable}/${scopes.total} read endpoints work, activities do not ->`));
+      console.log(yellow("  this is a token scope issue, nothing else."));
+      console.log("\n  Create a NEW token at https://runalyze.com/settings/personal-api with the");
+      console.log("  activity read permission ticked. An existing token cannot be widened —");
+      console.log("  Runalyze fixes a token's scopes when it is issued.");
     } else {
       console.log(yellow(`\n  ${scopes.reachable}/${scopes.total} read endpoints work, but activities do not.`));
-      console.log("  So reading in general is permitted and the activity scope specifically is");
-      console.log("  missing. Re-issue the token with the activity read permission selected.");
-      console.log("  If it is already selected, the subscription may not have propagated yet —");
-      console.log("  worth a retry, and otherwise a question for Runalyze support.");
+      console.log("  Reading is permitted in general, so the activity scope specifically is");
+      console.log("  missing. Re-issue the token with that permission selected.");
     }
     process.exit(2);
   }
