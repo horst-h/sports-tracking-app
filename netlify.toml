@@ -5,9 +5,14 @@
 # Ignore these keys from secrets scan:
 # - STRAVA_CLIENT_SECRET (server-side only, not in client bundle)
 # - VITE_STRAVA_CLIENT_ID (public client ID for OAuth, safe to expose)
+# - VITE_GOOGLE_CLIENT_ID / GOOGLE_CLIENT_ID (same value, and an OAuth client ID
+#   is public by design — it ships in the bundle so the sign-in button can work)
 # Without this, Netlify scanner flags them as secrets and blocks the build
+#
+# RUNALYZE_API_TOKEN is deliberately NOT listed: it must never reach the bundle,
+# so if the scanner ever finds it, the build should fail.
 [build.environment]
-  SECRETS_SCAN_OMIT_KEYS = "STRAVA_CLIENT_SECRET,VITE_STRAVA_CLIENT_ID,STRAVA_CLIENT_ID,OPENAI_API_KEY"
+  SECRETS_SCAN_OMIT_KEYS = "STRAVA_CLIENT_SECRET,VITE_STRAVA_CLIENT_ID,STRAVA_CLIENT_ID,OPENAI_API_KEY,VITE_GOOGLE_CLIENT_ID,GOOGLE_CLIENT_ID"
 
 [functions]
   directory = "netlify/functions"

@@ -11,17 +11,17 @@ export interface GoalData {
 }
 
 export interface StoredGoal extends GoalData {
-  athleteId: number;
+  /**
+   * Who the goal belongs to, as "google:<sub>".
+   *
+   * Replaces the Strava athlete id: Strava access is gone, and Runalyze has no
+   * identity endpoint to take its place. The Google subject is stable for the
+   * account and, unlike an email address, never reassigned.
+   */
+  subject: string;
   year: number;
   sport: Sport;
   createdAt: string;  // ISO
   updatedAt: string;  // ISO
   version: number;
-}
-
-export interface StravaAthlete {
-  id: number;
-  username?: string;
-  firstname?: string;
-  lastname?: string;
 }

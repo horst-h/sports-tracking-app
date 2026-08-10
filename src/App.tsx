@@ -8,6 +8,7 @@ import YearlyCountGoalCard from "./components/YearlyCountGoalCard";
 import YearlyElevationGoalCard from "./components/YearlyElevationGoalCard";
 import BottomDrawer from "./components/BottomDrawer";
 import LoginCard from "./components/LoginCard";
+import DataAttribution from "./components/DataAttribution";
 
 declare const __VITE_BUILD_TIME__: string;
 import PullToRefresh from "./components/PullToRefresh";
@@ -21,7 +22,7 @@ import { calculateForecast, type ForecastResult } from "./domain/metrics/forecas
 
 import { useActivities } from "./hooks/useActivities";
 import { useAthlete } from "./hooks/useAthlete";
-import { useAuth } from "./hooks/useAuth";
+import { useDataAccess } from "./hooks/useDataAccess";
 import * as goalsRepo from "./repositories/goalsRepository";
 import { clearToken } from "./repositories/tokenRepository";
 
@@ -95,13 +96,13 @@ export default function App() {
   const [goals, setGoals] = useState<YearGoals>(emptyGoals(year));
 
   // Auth check (MUST be before conditional return)
-  const { token } = useAuth();
+  const { ready, needsLogin, signIn, signOut } = useDataAccess();
 
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Athlete data (profile image) (MUST be before conditional return)
-  const { athlete } = useAthlete(!!token);
+  const { athlete } = useAthlete(ready);
 
   // Restore sport from URL on mount
   useEffect(() => {
@@ -123,7 +124,7 @@ export default function App() {
   }
 
   // activities (MUST be before conditional return)
-  const { activities, loading, refreshing, error, lastSync, refetch } = useActivities(year, !!token);
+  const { activities, loading, refreshing, error, lastSync, refetch } = useActivities(year, ready);
 
   // load goals whenever year changes OR drawer closes (after saving)
   useEffect(() => {
@@ -144,7 +145,7 @@ export default function App() {
 
   // Build dashboard data (MUST be before conditional return)
   const dashboard = useMemo(() => {
-    if (!token || !activities) return null;
+    if (!ready || !activities) return null;
 
     const asOfLocalIso = new Date().toISOString();
     const retrievedAtLocal = new Date().toString();
@@ -209,11 +210,11 @@ export default function App() {
       ride: buildForSport("ride"),
       swim: buildForSport("swim"),
     };
-  }, [activities, goals, year, mode, token]);
+  }, [activities, goals, year, mode, ready]);
 
-  // If not authenticated, show login card (AFTER all hooks)
-  if (!token) {
-    return <LoginCard />;
+  // Sources that authenticate in the browser need a login first (AFTER all hooks)
+  if (needsLogin) {
+    return <LoginCard onSignedIn={signIn} />;
   }
 
   const currentStats = dashboard
@@ -221,6 +222,9 @@ export default function App() {
     : null;
 
   async function handleForceLogout() {
+    // Both: the app's own session, and whatever Strava token is still lying
+    // around from before the switch.
+    await signOut();
     await clearToken();
     window.location.href = "/";
   }
@@ -233,7 +237,7 @@ export default function App() {
   const syncStatus = error ? 'error' : (loading || refreshing) ? 'syncing' : 'idle';
 
   return (
-    <PullToRefresh onRefresh={handleRefresh} enabled={!!token}>
+    <PullToRefresh onRefresh={handleRefresh} enabled={ready}>
       {/* Sticky Header + Tab Navigation Container */}
       <div
         style={{
@@ -364,10 +368,7 @@ export default function App() {
         marginTop: '1rem',
         flexWrap: 'wrap'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <img src="/icons/strava-logo.svg" alt="Strava" style={{ height: '1rem' }} />
-          data provided by <a href="https://strava.com" style={{ color: 'var(--text-muted)', textDecoration: 'underline' }}>Strava®</a>
-        </div>
+        <DataAttribution />
         <span style={{ opacity: 0.6 }}>• Build: {__VITE_BUILD_TIME__}</span>
       </footer>
     </PullToRefresh>

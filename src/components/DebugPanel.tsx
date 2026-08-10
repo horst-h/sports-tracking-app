@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ForecastMode } from "../domain/metrics/uiStats";
 import { loadToken, clearToken } from "../repositories/tokenRepository";
-import { getActivityProvider } from "../data/providerRegistry";
+import {
+  getActivityProvider,
+  getActivityProviderId,
+  setActivityProviderId,
+} from "../data/providerRegistry";
+import type { ProviderId } from "../domain/activity";
 import type { YearDashboard } from "../services/statsService";
 import { buildYearDashboard } from "../services/statsService";
 
@@ -30,6 +35,8 @@ export default function DebugPanel() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [data, setData] = useState<DebugData>({ year, mode });
+
+  const providerId = getActivityProviderId();
 
   if (!isDev) return null;
 
@@ -93,6 +100,16 @@ export default function DebugPanel() {
     await refreshTokenInfo();
   }
 
+  /**
+   * Reloads rather than re-rendering: hooks read the provider once on mount,
+   * and the caches are keyed per provider, so a clean load is both the honest
+   * and the cheaper way to switch sources.
+   */
+  function switchProvider(id: ProviderId) {
+    setActivityProviderId(id);
+    window.location.reload();
+  }
+
   useEffect(() => {
     void refreshTokenInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,6 +145,26 @@ export default function DebugPanel() {
       {open && (
         <>
           <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <label style={{ width: 80 }}>Source</label>
+              <div style={{ flex: 1, display: "flex", gap: 6 }}>
+                {(["strava", "runalyze"] as ProviderId[]).map((id) => (
+                  <button
+                    key={id}
+                    onClick={() => switchProvider(id)}
+                    disabled={id === providerId}
+                    style={{
+                      flex: 1,
+                      padding: "6px 10px",
+                      fontWeight: id === providerId ? 700 : 400,
+                    }}
+                  >
+                    {id}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <label style={{ width: 80 }}>Year</label>
               <input

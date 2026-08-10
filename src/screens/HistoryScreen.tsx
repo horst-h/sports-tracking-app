@@ -4,12 +4,13 @@ import { ArrowLeft } from "lucide-react";
 
 import LoginCard from "../components/LoginCard";
 import { fetchYearActivitiesLive, useActivities } from "../hooks/useActivities";
-import { useAuth } from "../hooks/useAuth";
+import { useDataAccess } from "../hooks/useDataAccess";
 import { normalizeActivities } from "../domain/metrics/normalize";
 import { aggregateYear } from "../domain/metrics/aggregate";
 import type { Sport } from "../domain/metrics/types";
 import { buildMonthlySeries, buildMonthlyTotalSeries, type HistoryMetric } from "../domain/metrics/monthly";
 import { loadYearActivities } from "../repositories/activitiesRepository";
+import { getActivityProviderId } from "../data/providerRegistry";
 import { formatNumber } from "../utils/format";
 import HistoryMonthlyChart, { type SportFilter } from "../components/history/HistoryMonthlyChart";
 import HistoryMonthlyCompareChart, {
@@ -183,7 +184,7 @@ function defaultCompareYear(primaryYear: number, years: number[]): number | null
 export default function HistoryScreen() {
   const navigate = useNavigate();
   const { year: yearParam } = useParams();
-  const { token } = useAuth();
+  const { ready, needsLogin } = useDataAccess();
   const currentYear = new Date().getFullYear();
 
   const [availableYears, setAvailableYears] = useState<number[]>([]);
@@ -198,7 +199,7 @@ export default function HistoryScreen() {
   useEffect(() => {
     let cancelled = false;
 
-    if (!token) {
+    if (!ready) {
       setYearsLoading(false);
       return () => {
         cancelled = true;
@@ -216,7 +217,7 @@ export default function HistoryScreen() {
         for (let year = currentYear; year >= currentYear - maxLookback; year -= 1) {
           if (cancelled) return;
 
-          const cached = await loadYearActivities(year);
+          const cached = await loadYearActivities(getActivityProviderId(), year);
           const activitiesForYear = cached?.activities ?? await fetchYearActivitiesLive(year);
 
           if (activitiesForYear.length > 0) {
@@ -242,7 +243,7 @@ export default function HistoryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [token, currentYear]);
+  }, [ready, currentYear]);
 
   const parsedYear = yearParam ? Number(yearParam) : null;
 
@@ -276,11 +277,11 @@ export default function HistoryScreen() {
     [displayYears, selectedYearValue]
   );
   const compareDisabled = compareYearOptions.length === 0;
-  const enabled = !!token && !!selectedYear;
+  const enabled = ready && !!selectedYear;
   const allowLive = selectedYear ? !availableYears.includes(selectedYear) : false;
   const { activities, loading, error, source } = useActivities(selectedYearValue, enabled, { allowLive });
 
-  const compareEnabled = !!token && chartMode === "compare" && !!compareYear;
+  const compareEnabled = ready && chartMode === "compare" && !!compareYear;
   const compareAllowLive = compareYear ? !availableYears.includes(compareYear) : false;
   const {
     activities: compareActivities,
@@ -418,7 +419,7 @@ export default function HistoryScreen() {
     });
   }, [primaryTotalSeries, secondaryTotalSeries, monthlySeries, secondaryMonthlySeries]);
 
-  if (!token) {
+  if (needsLogin) {
     return <LoginCard />;
   }
 
@@ -455,7 +456,7 @@ export default function HistoryScreen() {
                 <span></span>
                 <span></span>
               </div>
-              <div className="ai-loading__label">Query data from Strava(c)</div>
+              <div className="ai-loading__label">Loading activity data…</div>
             </div>
           </div>
         )}
@@ -587,7 +588,7 @@ export default function HistoryScreen() {
             <div className="card__body">
               <h3 className="history-empty-title">No history yet</h3>
               <p className="text-muted">
-                We could not find any activities yet. Once your Strava data is available, the years will appear here.
+                We could not find any activities yet. Once your activity data is available, the years will appear here.
               </p>
               <Link to="/" className="history-empty-link">Return to dashboard</Link>
             </div>

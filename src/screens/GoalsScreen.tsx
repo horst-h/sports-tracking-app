@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import type { GoalMetric, Sport, YearGoals } from "../domain/metrics/types";
 import { useGoals } from "../hooks/useGoals";
 import { useActivities } from "../hooks/useActivities";
-import { useAuth } from "../hooks/useAuth";
+import { useDataAccess } from "../hooks/useDataAccess";
 import * as goalsRepo from "../repositories/goalsRepository";
 import { normalizeActivities } from "../domain/metrics/normalize";
 import { aggregateYear } from "../domain/metrics/aggregate";
@@ -54,12 +54,12 @@ function emptyGoals(year: number): YearGoals {
 export default function GoalsScreen() {
   const navigate = useNavigate();
   const year = new Date().getFullYear();
-  const { token } = useAuth();
+  const { ready } = useDataAccess();
   
   const [selectedSport, setSelectedSport] = useState<Sport>("run");
   
   const { goals, loading: goalsLoading } = useGoals(year);
-  const { activities, loading: activitiesLoading } = useActivities(year, !!token);
+  const { activities, loading: activitiesLoading } = useActivities(year, ready);
   const pendingSaveRef = useRef<Promise<void> | null>(null);
   const [goalOverridesBySport, setGoalOverridesBySport] = useState<
     Record<Sport, Partial<Record<GoalMetric, number | undefined>>>
@@ -73,7 +73,7 @@ export default function GoalsScreen() {
   }, [goals, selectedSport, goalOverridesBySport]);
 
   const statsBySport = useMemo((): Record<Sport, UiAthleteStats> | null => {
-    if (!activities || !token) return null;
+    if (!activities || !ready) return null;
 
     const asOfLocalIso = new Date().toISOString();
     const retrievedAtLocal = new Date().toString();
@@ -98,7 +98,7 @@ export default function GoalsScreen() {
       ride: buildForSport("ride"),
       swim: buildForSport("swim"),
     };
-  }, [activities, goals, year, token]);
+  }, [activities, goals, year, ready]);
 
   const otherSport: Sport = selectedSport === "run" ? "ride" : "run";
   const stats = statsBySport ? statsBySport[selectedSport] : null;

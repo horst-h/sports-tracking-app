@@ -1,8 +1,6 @@
 import { openSportsDB } from "./db.ts";
 import type { YearGoals, Sport, GoalMetric } from "../domain/metrics/types.ts";
-import { loadToken } from "./tokenRepository.ts";
-import { withValidAccessToken } from "./tokenRepository.ts";
-import { refreshAccessToken } from "../services/stravaAuthApi.ts";
+import { authHeader } from "./googleSessionRepository.ts";
 
 const STORE = "goals";
 
@@ -21,7 +19,8 @@ type RemoteGoalData = {
 };
 
 type RemoteGoal = RemoteGoalData & {
-  athleteId: number;
+  /** "google:<sub>" — replaced the Strava athlete id when identity moved. */
+  subject: string;
   year: number;
   sport: Sport;
   createdAt: string;
@@ -95,32 +94,31 @@ function unwrapDoc(year: number, raw: any): YearGoals | null {
 
 const API_BASE = "/.netlify/functions/goals";
 
-async function getAccessToken(): Promise<string | null> {
-  const token = await loadToken();
-  if (!token) return null;
-
-  // Reuse the same refresh flow as Strava activity requests.
-  return withValidAccessToken(refreshAccessToken, { skewSeconds: 60 });
+/**
+ * The goals API authenticates with the app's own Google session, not with the
+ * activity source. Returns null when there is none, and every caller below
+ * treats that as "stay local" rather than as an error — goals are always
+ * written to the cache first, so an unauthenticated session still works,
+ * only without sync.
+ */
+async function getAuthHeader(): Promise<{ Authorization: string } | null> {
+  return authHeader();
 }
 
 /**
  * Fetch goal from backend API for a specific sport.
  */
 async function fetchGoalFromBackend(year: number, sport: Sport): Promise<RemoteGoal | null> {
-  const token = await getAccessToken();
-  if (!token) {
-    console.warn(`[GoalsRepository] No valid token for fetching goal (${year}/${sport})`);
+  const auth = await getAuthHeader();
+  if (!auth) {
+    console.warn(`[GoalsRepository] Not signed in; skipping backend fetch (${year}/${sport})`);
     return null;
   }
 
   try {
     const url = `${API_BASE}?year=${year}&sport=${sport}`;
     console.info(`[GoalsRepository] Fetching goal from backend: ${url}`);
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const response = await fetch(url, { headers: auth });
 
     if (!response.ok) {
       console.warn(`[GoalsRepository] Failed to fetch goal (${year}/${sport}): HTTP ${response.status}`);
@@ -145,9 +143,9 @@ async function saveGoalToBackend(
   sport: Sport,
   goalData: RemoteGoalData
 ): Promise<RemoteGoal | null> {
-  const token = await getAccessToken();
-  if (!token) {
-    console.warn(`[GoalsRepository] No valid token for saving goal (${year}/${sport})`);
+  const auth = await getAuthHeader();
+  if (!auth) {
+    console.warn(`[GoalsRepository] Not signed in; goal stays local (${year}/${sport})`);
     return null;
   }
 
@@ -155,10 +153,7 @@ async function saveGoalToBackend(
     console.info(`[GoalsRepository] Saving goal to backend (${year}/${sport}):`, goalData);
     const response = await fetch(API_BASE, {
       method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      headers: { ...auth, "Content-Type": "application/json" },
       body: JSON.stringify({
         year,
         sport,
@@ -185,21 +180,16 @@ async function saveGoalToBackend(
  * Delete goal from backend API for a specific sport.
  */
 async function deleteGoalFromBackend(year: number, sport: Sport): Promise<boolean> {
-  const token = await getAccessToken();
-  if (!token) {
-    console.warn(`[GoalsRepository] No valid token for deleting goal (${year}/${sport})`);
+  const auth = await getAuthHeader();
+  if (!auth) {
+    console.warn(`[GoalsRepository] Not signed in; skipping backend delete (${year}/${sport})`);
     return false;
   }
 
   try {
     const url = `${API_BASE}?year=${year}&sport=${sport}`;
     console.info(`[GoalsRepository] Deleting goal from backend: ${url}`);
-    const response = await fetch(url, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const response = await fetch(url, { method: "DELETE", headers: auth });
 
     if (!response.ok) {
       console.error(`[GoalsRepository] Failed to delete goal (${year}/${sport}): HTTP ${response.status}`);

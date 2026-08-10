@@ -1,6 +1,7 @@
 import type { NormalizedActivity } from "../domain/metrics/types";
 import type { Activity } from "../domain/activity";
 import type { StravaActivity } from "../data/strava/stravaTypes";
+import type { RunalyzeActivity } from "../data/runalyze/runalyzeTypes";
 
 /**
  * Deterministic fixture set for the golden master.
@@ -140,6 +141,105 @@ export const STRAVA_RAW: StravaActivity[] = [
     distance: 7000,
     total_elevation_gain: 50,
     moving_time: 2100,
+  },
+];
+
+/**
+ * Layer 2 input for the second provider: the raw Runalyze shape.
+ *
+ * Deliberately the same activities as STRAVA_RAW, expressed the way Runalyze
+ * expresses them — kilometres instead of metres, a self-describing timestamp
+ * instead of a bogus "Z", account-specific sport ids instead of type names.
+ * Both mappers therefore have to produce the same NormalizedActivity records,
+ * which is what makes the data source swap verifiable rather than hopeful.
+ *
+ * Shapes and values are taken from a live account (see scripts/runalyze-spike.ts);
+ * the sport ids are the real ones. The elevation pair is kept apart on purpose:
+ * `elevation_up` is Runalyze's map-corrected number, `elevation_up_file` what
+ * the device recorded.
+ */
+export const RUNALYZE_RAW: RunalyzeActivity[] = [
+  {
+    id: 1001,
+    sport: { id: 2312707, name: "Laufen" },
+    sport_id: 2312707,
+    date_time: "2025-01-15T07:30:00+01:00",
+    timezone_offset: 60,
+    title: "Morning Run",
+    distance: 10.5,
+    duration: 3600,
+    elapsed_time: 3700,
+    elevation_up: 120,
+    elevation_up_file: 180,
+    source: "garmin",
+  },
+  {
+    id: 1002,
+    sport: { id: 2312711, name: "Radfahren" },
+    sport_id: 2312711,
+    date_time: "2025-04-05T14:00:00+02:00",
+    timezone_offset: 120,
+    title: "Feierabendrunde",
+    distance: 45,
+    duration: 5400,
+    elevation_up: 500,
+    elevation_up_file: 620,
+    source: "garmin",
+  },
+  {
+    // Gravel is its own sport in Runalyze where Strava said "Ride".
+    id: 1007,
+    sport: { id: 2312733, name: "Gravel Cycling" },
+    sport_id: 2312733,
+    date_time: "2025-06-12T16:00:00+02:00",
+    timezone_offset: 120,
+    title: "Schotter",
+    distance: 80.5,
+    duration: 10800,
+    elevation_up: 1200,
+    elevation_up_file: 1400,
+    source: "garmin",
+  },
+  {
+    // Untracked sport — must be reported, not silently dropped.
+    id: 1004,
+    sport: { id: 2312731, name: "Hiking" },
+    sport_id: 2312731,
+    date_time: "2025-05-02T10:00:00+02:00",
+    timezone_offset: 120,
+    title: "Wanderung",
+    distance: 12,
+    duration: 7200,
+    elevation_up: 800,
+    elevation_up_file: 850,
+    source: "garmin",
+  },
+  {
+    id: 1005,
+    sport: { id: 2312707, name: "Laufen" },
+    sport_id: 2312707,
+    date_time: "2025-01-01T01:30:00+01:00",
+    timezone_offset: 60,
+    title: "Neujahrslauf",
+    distance: 5,
+    duration: 1800,
+    elevation_up: 20,
+    elevation_up_file: 35,
+    source: "garmin",
+  },
+  {
+    // Run at 00:30 local on 1 January; the instant is still 31 December UTC.
+    id: 1006,
+    sport: { id: 2312707, name: "Laufen" },
+    sport_id: 2312707,
+    date_time: "2025-01-01T00:30:00+01:00",
+    timezone_offset: 60,
+    title: "Silvesterlauf",
+    distance: 7,
+    duration: 2100,
+    elevation_up: 50,
+    elevation_up_file: 70,
+    source: "garmin",
   },
 ];
 

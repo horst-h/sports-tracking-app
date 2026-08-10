@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { getActivityProvider } from "../data/providerRegistry";
+import { getActivityProvider, getActivityProviderId } from "../data/providerRegistry";
 import type { Activity } from "../domain/activity";
 import { loadYearActivities, saveYearActivities } from "../repositories/activitiesRepository";
 
 const CACHE_TTL_MS = 3 * 60 * 60 * 1000; // 3h
 
 export async function fetchYearActivitiesLive(year: number): Promise<Activity[]> {
-  const all = await getActivityProvider().listYearActivities(year);
-  await saveYearActivities(year, all);
+  const provider = getActivityProvider();
+  const all = await provider.listYearActivities(year);
+  // Cached under the provider that produced it, never under the year alone.
+  await saveYearActivities(provider.id, year, all);
   return all;
 }
 
@@ -24,6 +26,11 @@ export function useActivities(year: number, enabled: boolean, options?: UseActiv
   const [lastSync, setLastSync] = useState<Date | undefined>(undefined);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
 
+  // Selecting a different source is a full page load, so this is stable for
+  // the lifetime of the hook. Listed as a dependency all the same, so the
+  // effect stays honest about what it reads.
+  const providerId = getActivityProviderId();
+
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
@@ -32,7 +39,7 @@ export function useActivities(year: number, enabled: boolean, options?: UseActiv
 
     (async () => {
       // 1) Cache laden
-      const cached = await loadYearActivities(year);
+      const cached = await loadYearActivities(providerId, year);
       if (cached && !cancelled && !forceRefresh) {
         setActivities(cached.activities);
         setLastSync(new Date(cached.fetchedAt));
@@ -88,7 +95,7 @@ export function useActivities(year: number, enabled: boolean, options?: UseActiv
     return () => {
       cancelled = true;
     };
-  }, [year, enabled, options?.allowLive, refetchTrigger]);
+  }, [year, enabled, options?.allowLive, refetchTrigger, providerId]);
 
   const refetch = async () => {
     setRefetchTrigger((prev) => prev + 1);

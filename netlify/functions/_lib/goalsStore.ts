@@ -1,13 +1,22 @@
-import type { StoredGoal, Sport, GoalData } from "./types";
+import type { StoredGoal, Sport } from "./types";
 
 /**
  * Storage interface for Goals.
  * Implementations can use Netlify Blobs, in-memory, or other backends.
  */
 export interface GoalsStore {
-  get(athleteId: number, year: number, sport: Sport): Promise<StoredGoal | null>;
+  get(subject: string, year: number, sport: Sport): Promise<StoredGoal | null>;
   set(goal: StoredGoal): Promise<StoredGoal>;
-  delete(athleteId: number, year: number, sport: Sport): Promise<boolean>;
+  delete(subject: string, year: number, sport: Sport): Promise<boolean>;
+}
+
+/**
+ * Subjects go into blob keys, so they must not be able to escape their own
+ * prefix. "google:<sub>" is already safe — Google subjects are digits — but the
+ * key builder should not depend on that staying true.
+ */
+function safeSubject(subject: string): string {
+  return subject.replace(/[^A-Za-z0-9:_-]/g, "_");
 }
 
 /**
@@ -16,28 +25,28 @@ export interface GoalsStore {
 export class InMemoryGoalsStore implements GoalsStore {
   private store = new Map<string, StoredGoal>();
 
-  private key(athleteId: number, year: number, sport: Sport): string {
-    return `${athleteId}:${year}:${sport}`;
+  private key(subject: string, year: number, sport: Sport): string {
+    return `${safeSubject(subject)}:${year}:${sport}`;
   }
 
-  async get(athleteId: number, year: number, sport: Sport): Promise<StoredGoal | null> {
-    return this.store.get(this.key(athleteId, year, sport)) ?? null;
+  async get(subject: string, year: number, sport: Sport): Promise<StoredGoal | null> {
+    return this.store.get(this.key(subject, year, sport)) ?? null;
   }
 
   async set(goal: StoredGoal): Promise<StoredGoal> {
-    this.store.set(this.key(goal.athleteId, goal.year, goal.sport), goal);
+    this.store.set(this.key(goal.subject, goal.year, goal.sport), goal);
     return goal;
   }
 
-  async delete(athleteId: number, year: number, sport: Sport): Promise<boolean> {
-    return this.store.delete(this.key(athleteId, year, sport));
+  async delete(subject: string, year: number, sport: Sport): Promise<boolean> {
+    return this.store.delete(this.key(subject, year, sport));
   }
 }
 
 /**
  * Netlify Blobs implementation.
  * Uses @netlify/blobs to persist goals as JSON files.
- * Key pattern: goals/<athleteId>/<year>/<sport>.json
+ * Key pattern: goals/<subject>/<year>/<sport>
  */
 export class NetlifyBlobsGoalsStore implements GoalsStore {
   private getStore: any;
@@ -79,43 +88,87 @@ export class NetlifyBlobsGoalsStore implements GoalsStore {
     }
   }
 
-  private key(athleteId: number, year: number, sport: Sport): string {
+  private key(subject: string, year: number, sport: Sport): string {
+    return `goals/${safeSubject(subject)}/${year}/${sport}`;
+  }
+
+  /**
+   * Where a goal sat before identity moved to Google: under the bare Strava
+   * athlete id. Only consulted when LEGACY_GOALS_ATHLETE_ID names one, so this
+   * cannot accidentally read another account's data.
+   */
+  private legacyKey(year: number, sport: Sport): string | null {
+    const athleteId = (process.env.LEGACY_GOALS_ATHLETE_ID ?? "").trim();
+    if (!/^\d+$/.test(athleteId)) return null;
     return `goals/${athleteId}/${year}/${sport}`;
   }
 
-  async get(athleteId: number, year: number, sport: Sport): Promise<StoredGoal | null> {
+  async get(subject: string, year: number, sport: Sport): Promise<StoredGoal | null> {
+    const key = this.key(subject, year, sport);
     try {
-      const key = this.key(athleteId, year, sport);
       const json = await this.store.get(key, { type: "json" });
       if (json) {
-        console.info(`[NetlifyBlobsGoalsStore] Retrieved goal: ${key}`, json);
+        console.info(`[NetlifyBlobsGoalsStore] Retrieved goal: ${key}`);
+        return json;
       }
-      return json ?? null;
     } catch (error) {
-      console.error(`[NetlifyBlobsGoalsStore] Error retrieving goal: athleteId=${athleteId}, year=${year}, sport=${sport}`, error);
+      console.error(`[NetlifyBlobsGoalsStore] Error retrieving goal: ${key}`, error);
+      return null;
+    }
+
+    return this.adoptLegacy(subject, year, sport);
+  }
+
+  /**
+   * Copies a pre-Google goal to its new key the first time it is asked for.
+   *
+   * Lazy rather than a migration pass: it needs no listing, it cannot run
+   * halfway, and a goal that is never read is never touched. The original is
+   * left in place, so this stays reversible.
+   */
+  private async adoptLegacy(
+    subject: string,
+    year: number,
+    sport: Sport
+  ): Promise<StoredGoal | null> {
+    const legacyKey = this.legacyKey(year, sport);
+    if (!legacyKey) return null;
+
+    try {
+      const legacy = await this.store.get(legacyKey, { type: "json" });
+      if (!legacy) return null;
+
+      const adopted: StoredGoal = { ...legacy, subject, year, sport };
+      await this.store.setJSON(this.key(subject, year, sport), adopted);
+      console.info(`[NetlifyBlobsGoalsStore] Adopted ${legacyKey} as ${this.key(subject, year, sport)}`);
+      return adopted;
+    } catch (error) {
+      console.error(`[NetlifyBlobsGoalsStore] Could not adopt ${legacyKey}`, error);
       return null;
     }
   }
 
   async set(goal: StoredGoal): Promise<StoredGoal> {
+    const key = this.key(goal.subject, goal.year, goal.sport);
     try {
-      const key = this.key(goal.athleteId, goal.year, goal.sport);
       await this.store.setJSON(key, goal);
-      console.info(`[NetlifyBlobsGoalsStore] Saved goal: ${key}`, goal);
+      console.info(`[NetlifyBlobsGoalsStore] Saved goal: ${key}`);
       return goal;
     } catch (error) {
-      console.error("[NetlifyBlobsGoalsStore] Error saving goal:", error, goal);
+      console.error(`[NetlifyBlobsGoalsStore] Error saving goal: ${key}`, error);
       throw error;
     }
   }
 
-  async delete(athleteId: number, year: number, sport: Sport): Promise<boolean> {
+  async delete(subject: string, year: number, sport: Sport): Promise<boolean> {
+    const key = this.key(subject, year, sport);
     try {
-      const key = this.key(athleteId, year, sport);
       await this.store.delete(key);
       console.info(`[NetlifyBlobsGoalsStore] Deleted goal: ${key}`);
       return true;
     } catch (error) {
+      // Previously referenced `key` from inside the try block, which threw a
+      // ReferenceError and masked the real failure.
       console.error(`[NetlifyBlobsGoalsStore] Error deleting goal: ${key}`, error);
       return false;
     }

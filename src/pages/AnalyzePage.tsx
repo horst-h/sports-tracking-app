@@ -3,7 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useMemo } from 'react';
 import { useActivities } from '../hooks/useActivities';
 import { useAthlete } from '../hooks/useAthlete';
-import { useAuth } from '../hooks/useAuth';
+import { useDataAccess } from '../hooks/useDataAccess';
 import { buildUiAthleteStats } from '../domain/metrics/uiStats';
 import { aggregateYear } from '../domain/metrics/aggregate';
 import { normalizeActivities } from '../domain/metrics/normalize';
@@ -56,42 +56,21 @@ export default function AnalyzePage() {
 
   // Load data
   const year = new Date().getFullYear();
-  const { token } = useAuth();
-  const enabled = !!token && !!isValidSport && !!isValidMetric;
+  const { ready, needsLogin } = useDataAccess();
+  // Whether the URL names a sport and metric this page can actually analyse.
+  // Checked here and rendered on far below: returning early at this point
+  // would skip the hooks that follow, and React throws the moment a later
+  // render runs a different number of them.
+  const routeOk = !!isValidSport && !!isValidMetric;
+  const enabled = ready && routeOk;
   const { activities, loading: activitiesLoading } = useActivities(year, enabled);
   useAthlete(enabled); // Ensure athlete is loaded but not directly used
   const { goals } = useGoals(year);
 
-  if (!isValidSport || !isValidMetric) {
-    return (
-      <div className="container-page">
-        <div className="card card--primary" style={{ marginTop: '2rem' }}>
-          <div className="card__body">
-            <h2 style={{ color: 'var(--text-muted)' }}>Invalid route</h2>
-            <p style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-              sport={sportParam}, metric={metricParam}
-            </p>
-            <button
-              onClick={() => navigate('/')}
-              style={{
-                padding: '0.75rem 1.5rem',
-                borderRadius: '0.5rem',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-secondary)',
-                cursor: 'pointer',
-              }}
-            >
-              Return to Dashboard
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Build UI stats with same logic as App.tsx
   const uiStats = useMemo(() => {
-    if (!token || !activities || activities.length === 0 || !goals) return null;
+    if (!routeOk || !sport) return null;
+    if (!ready || !activities || activities.length === 0 || !goals) return null;
 
     const asOfLocalIso = new Date().toISOString();
     const retrievedAtLocal = new Date().toString();
@@ -110,18 +89,19 @@ export default function AnalyzePage() {
     });
 
     return stats;
-  }, [activities, goals, year, sport]);
+  }, [activities, goals, year, sport, ready, routeOk]);
 
   // Build aggregate for chart visualization
   const aggregate = useMemo(() => {
-    if (!token || !activities || activities.length === 0) return null;
+    if (!routeOk || !sport) return null;
+    if (!ready || !activities || activities.length === 0) return null;
 
     const asOfLocalIso = new Date().toISOString();
     const normalized = normalizeActivities(activities);
     const agg = aggregateYear(normalized, year, sport, asOfLocalIso);
 
     return agg;
-  }, [activities, year, sport, token]);
+  }, [activities, year, sport, ready, routeOk]);
 
   // Derive facts
   const facts = useMemo(() => {
@@ -230,9 +210,38 @@ export default function AnalyzePage() {
 
   // Build narrative
   const narrative = useMemo(() => {
-    if (!facts) return null;
+    // sport and metric are only implied to be set by facts existing; state it,
+    // now that no early return narrows them any more.
+    if (!facts || !sport || !metric) return null;
     return buildNarrative(sport, metric, facts);
   }, [facts, sport, metric]);
+
+  if (!isValidSport || !isValidMetric) {
+    return (
+      <div className="container-page">
+        <div className="card card--primary" style={{ marginTop: '2rem' }}>
+          <div className="card__body">
+            <h2 style={{ color: 'var(--text-muted)' }}>Invalid route</h2>
+            <p style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+              sport={sportParam}, metric={metricParam}
+            </p>
+            <button
+              onClick={() => navigate('/')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-secondary)',
+                cursor: 'pointer',
+              }}
+            >
+              Return to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (activitiesLoading) {
     return (
@@ -260,9 +269,9 @@ export default function AnalyzePage() {
           <div className="card__body">
             <h2 style={{ color: 'var(--text-muted)' }}>No data</h2>
             <p style={{ marginTop: '1rem', marginBottom: '1rem' }}>
-              {!token
-                ? 'Sign in with Strava first.'
-                : 'Sync activities from Strava first.'}
+              {needsLogin
+                ? 'Sign in first.'
+                : 'No activities synced for this year yet.'}
             </p>
             <button
               onClick={() => navigate('/')}

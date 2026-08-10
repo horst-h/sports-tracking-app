@@ -1,5 +1,5 @@
 import type { Handler } from "@netlify/functions";
-import { extractBearerToken, validateStravaToken } from "./_lib/strava";
+import { requireIdentity } from "./_lib/identity";
 import { createGoalsStore } from "./_lib/goalsStore";
 import type { Sport, GoalData, StoredGoal } from "./_lib/types";
 
@@ -80,20 +80,14 @@ export const handler: Handler = async (event) => {
 
   console.info(`[Goals API] Incoming ${event.httpMethod} request`);
 
-  // Extract and validate token
-  const token = extractBearerToken(event.headers.authorization);
-  if (!token) {
-    console.warn("[Goals API] Missing authorization token");
-    return json(401, { error: "missing_authorization" });
+  const auth = await requireIdentity(event.headers);
+  if (!auth.ok) {
+    console.warn(`[Goals API] Rejected: ${auth.error}`);
+    return json(auth.status, { error: auth.error });
   }
 
-  const athlete = await validateStravaToken(token);
-  if (!athlete) {
-    console.warn("[Goals API] Invalid/expired token");
-    return json(401, { error: "invalid_token" });
-  }
-
-  console.info(`[Goals API] Authenticated athlete: ${athlete.id}`);
+  const subject = auth.subject;
+  console.info(`[Goals API] Authenticated subject: ${subject}`);
 
   const store = createGoalsStore();
 
@@ -113,8 +107,8 @@ export const handler: Handler = async (event) => {
       return json(400, { error: "invalid_sport" });
     }
 
-    console.info(`[Goals API] Fetching goal: athlete=${athlete.id}, year=${year}, sport=${sportParam}`);
-    const goal = await store.get(athlete.id, year, sportParam);
+    console.info(`[Goals API] Fetching goal: subject=${subject}, year=${year}, sport=${sportParam}`);
+    const goal = await store.get(subject, year, sportParam);
     console.info(`[Goals API] Goal found:`, goal ? "yes" : "no");
     return json(200, { goal });
   }
@@ -146,14 +140,14 @@ export const handler: Handler = async (event) => {
       return json(400, { error: "invalid_goal_data" });
     }
 
-    console.info(`[Goals API] Saving goal: athlete=${athlete.id}, year=${year}, sport=${body.sport}`, goalData);
+    console.info(`[Goals API] Saving goal: subject=${subject}, year=${year}, sport=${body.sport}`, goalData);
 
     // Load existing or create new
-    const existing = await store.get(athlete.id, year, body.sport);
+    const existing = await store.get(subject, year, body.sport);
     const now = nowIso();
 
     const storedGoal: StoredGoal = {
-      athleteId: athlete.id,
+      subject,
       year,
       sport: body.sport,
       ...goalData,
@@ -183,8 +177,8 @@ export const handler: Handler = async (event) => {
       return json(400, { error: "invalid_sport" });
     }
 
-    console.info(`[Goals API] Deleting goal: athlete=${athlete.id}, year=${year}, sport=${sportParam}`);
-    const deleted = await store.delete(athlete.id, year, sportParam);
+    console.info(`[Goals API] Deleting goal: subject=${subject}, year=${year}, sport=${sportParam}`);
+    const deleted = await store.delete(subject, year, sportParam);
     console.info(`[Goals API] Goal deletion result:`, deleted);
     return json(200, { ok: deleted });
   }

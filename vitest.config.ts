@@ -13,7 +13,9 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   test: {
-    include: ["src/**/*.test.ts"],
+    // The Netlify functions carry the token verification, which is the one
+    // piece of this app where a silent mistake is a security hole.
+    include: ["src/**/*.test.ts", "netlify/**/*.test.ts"],
     setupFiles: ["./src/test/setup.ts"],
     environment: "node",
   },

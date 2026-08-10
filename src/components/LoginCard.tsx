@@ -1,14 +1,39 @@
-import { startStravaLogin } from "../services/auth";
+import { useEffect, useRef, useState } from "react";
+import { mountGoogleSignIn } from "../services/googleAuth";
+import type { GoogleSession } from "../repositories/googleSessionRepository";
 
-export default function LoginCard() {
-  const handleLogin = async () => {
-    try {
-      await startStravaLogin();
-    } catch (error) {
-      console.error("Login failed:", error);
-      alert("Login failed. Please try again.");
-    }
-  };
+type Props = {
+  onSignedIn?: (session: GoogleSession) => void;
+};
+
+export default function LoginCard({ onSignedIn }: Props) {
+  const buttonRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const target = buttonRef.current;
+    if (!target) return;
+
+    let cancelled = false;
+
+    void mountGoogleSignIn(
+      target,
+      (session) => {
+        if (cancelled) return;
+        // Without a handler, fall back to a reload: the session is already in
+        // IndexedDB at this point, so the next load picks it up.
+        if (onSignedIn) onSignedIn(session);
+        else window.location.reload();
+      },
+      (message) => {
+        if (!cancelled) setError(message);
+      }
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onSignedIn]);
 
   return (
     <div
@@ -32,7 +57,7 @@ export default function LoginCard() {
               textAlign: "center",
             }}
           >
-            Not authenticated
+            still moving
           </h1>
 
           <p
@@ -44,33 +69,23 @@ export default function LoginCard() {
               textAlign: "center",
             }}
           >
-            Please sign in with Strava to continue and start tracking your activities.
+            Sign in to see your activities and goals.
           </p>
 
-          <button
-            onClick={handleLogin}
-            style={{
-              width: "100%",
-              padding: "0.75rem 1.5rem",
-              fontSize: "16px",
-              fontWeight: "600",
-              borderRadius: "0.5rem",
-              border: "none",
-              backgroundColor: "var(--primary, #FC4C02)",
-              color: "#fff",
-              cursor: "pointer",
-              transition: "opacity 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              (e.target as HTMLButtonElement).style.opacity = "0.9";
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLButtonElement).style.opacity = "1";
-            }}
-            aria-label="Login with Strava"
-          >
-            Login with Strava
-          </button>
+          <div style={{ display: "flex", justifyContent: "center" }} ref={buttonRef} />
+
+          {error && (
+            <p
+              style={{
+                marginTop: "1rem",
+                fontSize: "13px",
+                color: "var(--text-error, #c00)",
+                textAlign: "center",
+              }}
+            >
+              {error}
+            </p>
+          )}
 
           <p
             style={{
@@ -80,7 +95,8 @@ export default function LoginCard() {
               textAlign: "center",
             }}
           >
-            This will redirect you to Strava's login page. We'll never share your credentials.
+            Your Google account is used to identify you, nothing else. Activities come
+            from Runalyze.
           </p>
         </div>
       </div>

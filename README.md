@@ -4,11 +4,12 @@ This template provides a minimal setup to get React working in Vite with HMR and
 
 ## Sports Tracking App
 
-Eine React-basierte Sporttracking-App mit Strava-Integration und Backend-Persistenz für Trainingsziele.
+Eine React-basierte Sporttracking-App mit Runalyze als Datenquelle und Backend-Persistenz für Trainingsziele.
 
 ### Features
 
-- Strava OAuth Integration
+- Google Sign-In als App-Login (Identität für gespeicherte Ziele)
+- Aktivitäten aus Runalyze über einen serverseitigen Proxy
 - Aktivitäten-Tracking (Laufen, Radfahren)
 - Jährliche Trainingsziele mit Backend-Persistenz
 - AI-gestützte Insights und Prognosen
@@ -23,7 +24,7 @@ npm install
 # Dev Server starten
 npm run dev
 
-# Dev Server mit Netlify (Strava OAuth lokal, Port 8888)
+# Dev Server mit Netlify (Functions + Login, Port 8888)
 npm run dev:netlify
 
 oder 
@@ -34,7 +35,7 @@ npx netlify dev
 npm run build
 ```
 
-Hinweis: Für den lokalen Strava-Login immer den Netlify-Dev-Server nutzen, da Redirects und Functions darüber laufen.
+Hinweis: Immer den Netlify-Dev-Server nutzen (Port 8888). Login, Runalyze-Proxy und Goals API laufen alle über Functions, der reine Vite-Server auf 5173 kennt sie nicht.
 
 ### Backend-Funktionen (Netlify Functions)
 
@@ -56,43 +57,67 @@ Die Goals API ermöglicht es, Trainingsziele pro Sportler im Backend zu persisti
 
 **Authentifizierung:**
 
-Alle Requests müssen einen gültigen Strava Access Token im Authorization Header enthalten:
+Alle Requests müssen ein gültiges Google ID Token im Authorization Header enthalten:
 ```
-Authorization: Bearer <strava_access_token>
+Authorization: Bearer <google_id_token>
 ```
 
-Die Function validiert den Token durch einen Call zu Strava's `/athlete` Endpoint und ermittelt daraus die Athlete ID. Nur Goals für diese Athlete ID können gelesen/geschrieben/gelöscht werden.
+Die Function verifiziert das Token lokal gegen Googles veröffentlichte Signaturschlüssel (Signatur, Issuer, Audience, Ablauf, verifizierte Mailadresse) und prüft das Konto gegen eine Allowlist. Ohne konfigurierte Allowlist wird niemand durchgelassen. Aus dem Subject entsteht der Storage-Key.
 
 **Storage:**
 
 Goals werden in Netlify Blobs gespeichert mit folgendem Key-Schema:
 ```
-goals/<athleteId>/<year>/<sport>.json
+goals/google:<sub>/<year>/<sport>
 ```
+
+Ziele aus der Strava-Zeit liegen unter `goals/<athleteId>/…`. Ist `LEGACY_GOALS_ATHLETE_ID` gesetzt, werden sie beim ersten Lesen auf den neuen Key kopiert; das Original bleibt liegen.
 
 Fallback: Falls Netlify Blobs nicht verfügbar ist (z.B. in lokaler Entwicklung), verwendet die Function einen In-Memory Store.
 
-#### OAuth Functions
+#### Runalyze Proxy
+
+`GET /.netlify/functions/runalyze?resource=activity|ping&page=&itemsPerPage=`
+
+Der Browser kann die Runalyze-API nicht direkt ansprechen: nur der Custom-Header `token` authentifiziert, und der CORS-Preflight erlaubt ihn nicht. Der Proxy hält den Token serverseitig, lässt ausschließlich GET auf eine Resource-Allowlist zu und verlangt dieselbe Google-Authentifizierung wie die Goals API.
+
+#### OAuth Functions (Strava, historisch)
 
 - `/.netlify/functions/oauth-callback` - Strava OAuth Callback
 - `/.netlify/functions/oauth-refresh` - Token Refresh
+
+Strava ist nicht mehr die Datenquelle. Der Provider bleibt registriert, damit `?provider=strava` die bereits gecachten Jahre lesen kann; Live-Abrufe schlagen fehl.
 
 ### Umgebungsvariablen
 
 Für Netlify-Deployment müssen folgende Environment Variables gesetzt sein:
 
 ```bash
+# Runalyze (serverseitig, niemals VITE_-präfigiert)
+RUNALYZE_API_TOKEN=<personal-api-token>
+
+# Google Sign-In
+GOOGLE_CLIENT_ID=<oauth-client-id>        # serverseitig, für die Audience-Prüfung
+VITE_GOOGLE_CLIENT_ID=<oauth-client-id>   # im Browser, öffentlich
+ALLOWED_GOOGLE_EMAILS=<deine-mailadresse> # oder ALLOWED_GOOGLE_SUBS
+
+# optional: einmalige Übernahme der Ziele aus der Strava-Zeit
+LEGACY_GOALS_ATHLETE_ID=<strava-athlete-id>
+
+# Strava (historisch)
 STRAVA_CLIENT_ID=<your-strava-client-id>
 STRAVA_CLIENT_SECRET=<your-strava-client-secret>
 APP_BASE_URL=<your-app-url>
 ```
+
+Der Google-OAuth-Client braucht als *Authorised JavaScript origins* `http://localhost:8888` und die Netlify-URL. *Authorised redirect URIs* bleiben leer — der ID-Token-Flow leitet nicht um.
 
 ### Datenmodell
 
 **Goals (Backend):**
 ```typescript
 {
-  athleteId: number;      // Strava Athlete ID
+  subject: string;        // "google:<sub>"
   year: number;           // Zieljahr
   sport: "run" | "ride";  // Sportart
   distanceKm?: number;    // Distanzziel in km
@@ -122,7 +147,8 @@ Goals werden auch lokal gecacht für Offline-Nutzung und schnelle UI-Reaktion. D
 **Backend:**
 - Netlify Serverless Functions
 - Netlify Blobs als Storage
-- Strava API Integration
+- Runalyze API hinter einem Read-only-Proxy
+- Google ID Token Verifikation (lokal, gegen Googles JWKS)
 
 **Storage Layers:**
 1. **Remote** (Netlify Blobs): Persistente Speicherung
