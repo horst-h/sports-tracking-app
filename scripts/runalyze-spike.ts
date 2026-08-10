@@ -12,9 +12,12 @@
  *   4. Which sport ids does *this account* use?  (they are account specific
  *      and there is no endpoint to list them)
  *   5. How does pagination behave, and are there rate limit headers?
- *   6. Is the history complete, per year and sport, so it can be compared
+ *   6. Does Runalyze's `elevation_up` match what the device recorded in
+ *      `elevation_up_file`?  Runalyze can substitute map-based altitude, and
+ *      that difference lands straight in a yearly elevation goal.
+ *   7. Is the history complete, per year and sport, so it can be compared
  *      against the numbers currently cached from Strava?
- *   7. Are there duplicates from importing the same activity twice?
+ *   8. Are there duplicates from importing the same activity twice?
  *
  * READ ONLY. This script never issues anything but GET requests.
  *
@@ -311,7 +314,8 @@ async function main() {
   // -- 6. field coverage ---------------------------------------------------
   heading(6, "Coverage of the fields the app maps");
 
-  const fields = ["id", "sport", "date_time", "timezone_offset", "title", "distance", "duration", "elapsed_time", "elevation_up", "source"];
+  const fields = ["id", "sport", "date_time", "timezone_offset", "title", "distance", "duration",
+    "elapsed_time", "elevation_up", "elevation_up_file", "elevation_source", "source"];
   table(
     fields.map((f) => {
       const present = all.filter((a) => a[f] !== undefined && a[f] !== null).length;
@@ -325,10 +329,50 @@ async function main() {
   for (const a of all) sources.set(String(a.source ?? "?"), (sources.get(String(a.source ?? "?")) ?? 0) + 1);
   console.log(`\n  import sources: ${[...sources.entries()].map(([k, v]) => `${k}=${v}`).join("  ")}`);
 
-  // -- 7. history per year and sport --------------------------------------
-  heading(7, "History per year — compare these against your cached Strava numbers");
+  // -- 7. elevation: corrected vs as recorded ------------------------------
+  heading(7, "Elevation — Runalyze's value vs what the device recorded");
 
-  type Bucket = { count: number; km: number; elev: number };
+  const srcCount = new Map<string, number>();
+  for (const a of all) srcCount.set(String(a.elevation_source ?? "?"), (srcCount.get(String(a.elevation_source ?? "?")) ?? 0) + 1);
+  console.log(`  elevation_source: ${[...srcCount.entries()].map(([k, v]) => `${k}=${v}`).join("  ")}`);
+
+  const bothElev = all.filter(
+    (a) => typeof a.elevation_up === "number" && typeof a.elevation_up_file === "number" && (a.elevation_up_file as number) > 0
+  );
+
+  if (bothElev.length === 0) {
+    console.log(dim("  elevation_up_file is not populated — no comparison possible"));
+  } else {
+    const sumUsed = bothElev.reduce((t, a) => t + (a.elevation_up as number), 0);
+    const sumFile = bothElev.reduce((t, a) => t + (a.elevation_up_file as number), 0);
+    const differing = bothElev.filter((a) => a.elevation_up !== a.elevation_up_file).length;
+
+    const deltas = bothElev
+      .map((a) => ((a.elevation_up as number) - (a.elevation_up_file as number)) / (a.elevation_up_file as number))
+      .sort((x, y) => x - y);
+    const medianDelta = deltas[Math.floor(deltas.length / 2)] * 100;
+
+    console.log(`  compared          : ${bothElev.length} activities, ${differing} differ (${pct(differing, bothElev.length)})`);
+    console.log(`  total elevation_up      : ${sumUsed.toFixed(0)} m   ${dim("<- what the app would show")}`);
+    console.log(`  total elevation_up_file : ${sumFile.toFixed(0)} m   ${dim("<- what your Garmin recorded")}`);
+    console.log(`  median per-activity delta: ${medianDelta >= 0 ? "+" : ""}${medianDelta.toFixed(1)}%`);
+
+    const overall = sumFile === 0 ? 0 : ((sumUsed - sumFile) / sumFile) * 100;
+    const verdict = Math.abs(overall) < 2 ? green : Math.abs(overall) < 10 ? yellow : red;
+    console.log(`  ${b("overall difference")}: ${verdict(`${overall >= 0 ? "+" : ""}${overall.toFixed(1)}%`)}`);
+    console.log(
+      dim(
+        "\n  Your Strava numbers came from the same Garmin files. If this differs\n" +
+        "  noticeably, your elevation goal will read differently after the switch.\n" +
+        "  The mapper can use elevation_up_file instead to stay closer to Strava."
+      )
+    );
+  }
+
+  // -- 8. history per year and sport --------------------------------------
+  heading(8, "History per year — compare these against your cached Strava numbers");
+
+  type Bucket = { count: number; km: number; elev: number; elevFile: number };
   const byYear = new Map<string, Bucket>();
   let undated = 0;
 
@@ -340,10 +384,11 @@ async function main() {
     }
     const sportName = ((a.sport ?? {}) as { name?: string }).name ?? String(a.sport_id ?? "?");
     const key = `${d.getUTCFullYear()}|${sportName}`;
-    const bucket = byYear.get(key) ?? { count: 0, km: 0, elev: 0 };
+    const bucket = byYear.get(key) ?? { count: 0, km: 0, elev: 0, elevFile: 0 };
     bucket.count += 1;
     bucket.km += toKm((a.distance as number) ?? 0);
     bucket.elev += ((a.elevation_up as number) ?? 0);
+    bucket.elevFile += ((a.elevation_up_file as number) ?? (a.elevation_up as number) ?? 0);
     byYear.set(key, bucket);
   }
 
@@ -352,13 +397,20 @@ async function main() {
       .sort((x, y) => (x[0] < y[0] ? 1 : -1))
       .map(([key, v]) => {
         const [year, sport] = key.split("|");
-        return { year, sport, activities: v.count, km: v.km.toFixed(1), elevation_m: v.elev.toFixed(0) };
+        return {
+          year,
+          sport,
+          activities: v.count,
+          km: v.km.toFixed(1),
+          elev_runalyze: v.elev.toFixed(0),
+          elev_device: v.elevFile.toFixed(0),
+        };
       })
   );
   if (undated) console.log(yellow(`  ${undated} activities had no usable date`));
 
-  // -- 8. duplicates -------------------------------------------------------
-  heading(8, "Possible duplicates  (relevant after importing from a second source)");
+  // -- 9. duplicates -------------------------------------------------------
+  heading(9, "Possible duplicates  (Garmin imported twice, e.g. directly and via an older Strava sync)");
 
   const seen = new Map<string, RawActivity[]>();
   for (const a of all) {
@@ -386,8 +438,8 @@ async function main() {
     if (dupes.length > 15) console.log(dim(`  ... and ${dupes.length - 15} more`));
   }
 
-  // -- 9. bonus: precomputed statistics ------------------------------------
-  heading(9, "Bonus: /statistics/current");
+  // -- 10. bonus: precomputed statistics ------------------------------------
+  heading(10, "Bonus: /statistics/current");
 
   const stats = await get("/statistics/current");
   if (stats.status === 200 && stats.body && typeof stats.body === "object") {
@@ -426,7 +478,7 @@ async function main() {
     )
   );
 
-  heading(10, "Written");
+  heading(11, "Written");
   console.log(`  ${rawPath}     ${dim("25 raw activities — use as test fixtures for the mapper")}`);
   console.log(`  ${summaryPath}          ${dim("machine readable findings")}`);
   console.log(yellow(`\n  Both contain your activity data. ${OUT_DIR}/ is gitignored.\n`));
