@@ -209,6 +209,49 @@ function localDate(a: RawActivity, addOffset: boolean): Date | null {
   return new Date(d.getTime() + off * 60_000);
 }
 
+
+/**
+ * When activity read is denied, probe a spread of read endpoints to tell the
+ * two plausible causes apart:
+ *
+ *   - every read endpoint denied  -> the token carries no read scopes at all
+ *   - some succeed, activity does not -> the activity scope specifically is
+ *     missing, or the subscription has not taken effect for it
+ *
+ * Runalyze assigns scopes per token, and tokens issued before the 2025 API
+ * refactor keep only the permissions they had back then — a pre-existing
+ * token stays write-only no matter which plan the account is on.
+ *
+ * All GET, all harmless.
+ */
+async function probeReadScopes() {
+  const endpoints: Array<[string, string]> = [
+    ["/activity?preset=latest", "Activity (needed by this app)"],
+    ["/statistics/current", "Statistics (Supporter/Premium)"],
+    ["/tag", "Tags"],
+    ["/equipment", "Equipment"],
+    ["/metrics/latest", "Health metrics"],
+    ["/settings/date-range", "Account settings"],
+    ["/raceresult", "Race results"],
+  ];
+
+  const rows: Array<Record<string, string | number>> = [];
+  let ok = 0;
+
+  for (const [path, label] of endpoints) {
+    const res = await get(path);
+    if (res.status === 200) ok++;
+    rows.push({
+      endpoint: path.split("?")[0],
+      what: label,
+      status: res.status === 200 ? "200 OK" : String(res.status),
+    });
+  }
+
+  table(rows);
+  return { reachable: ok, total: endpoints.length };
+}
+
 // ---------------------------------------------------------------------- main
 
 async function main() {
@@ -230,11 +273,27 @@ async function main() {
   if (!probeOk) {
     console.log(red("\n  No read access to activities."));
     console.log("  Response:", JSON.stringify(probe.body).slice(0, 400));
-    if (probe.status === 403) {
-      console.log(yellow("\n  403 usually means one of two things:"));
-      console.log("    - the account has no Supporter/Premium subscription, or");
-      console.log("    - the token was created without read scopes.");
-      console.log("  Both are fixable without touching any code.");
+
+    if (probe.status === 401) {
+      console.log(yellow("\n  401 — the token itself is not accepted. Check for typos or expiry."));
+      process.exit(2);
+    }
+
+    console.log(dim("\n  /ping answered, so the token is valid. Probing which reads are permitted:\n"));
+    const scopes = await probeReadScopes();
+
+    if (scopes.reachable === 0) {
+      console.log(yellow("\n  Every read endpoint is denied -> the token has no read scopes."));
+      console.log("  Create a NEW token at https://runalyze.com/settings/personal-api and tick");
+      console.log("  the read permissions. Note that tokens issued before the 2025 API refactor");
+      console.log("  keep only their original permissions — an existing token cannot gain read");
+      console.log("  access, it has to be replaced.");
+    } else {
+      console.log(yellow(`\n  ${scopes.reachable}/${scopes.total} read endpoints work, but activities do not.`));
+      console.log("  So reading in general is permitted and the activity scope specifically is");
+      console.log("  missing. Re-issue the token with the activity read permission selected.");
+      console.log("  If it is already selected, the subscription may not have propagated yet —");
+      console.log("  worth a retry, and otherwise a question for Runalyze support.");
     }
     process.exit(2);
   }
