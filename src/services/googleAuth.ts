@@ -1,4 +1,5 @@
-import { readClaims, saveSession, type GoogleSession } from "../repositories/googleSessionRepository";
+import { saveSession, type GoogleSession } from "../repositories/googleSessionRepository";
+import { createSession } from "./appSessionApi";
 
 /**
  * Google Identity Services, loaded on demand.
@@ -7,6 +8,10 @@ import { readClaims, saveSession, type GoogleSession } from "../repositories/goo
  * straight to the page, the Netlify functions verify it, and there is no
  * callback URL to register or code to exchange. That is also why the OAuth
  * client needs authorised JavaScript origins but no redirect URIs.
+ *
+ * The token Google hands over is not the session. It is posted to /session,
+ * which verifies it and sets the cookie the app actually runs on, and is then
+ * dropped. Google is involved at this one moment and not again for months.
  */
 
 const GSI_SRC = "https://accounts.google.com/gsi/client";
@@ -68,9 +73,9 @@ function loadGsi(): Promise<GoogleIdApi> {
  * Renders Google's sign-in button and resolves the session once the athlete
  * has signed in.
  *
- * `auto_select` matters more than it looks: a returning athlete gets a fresh
- * token without touching anything, which is what makes the one-hour lifetime
- * of an ID token bearable.
+ * `auto_select` stays on, but it is no longer load-bearing: it used to be what
+ * made an hourly re-login survivable, and now it only smooths over the sign-in
+ * that happens when a session has genuinely run out.
  */
 export async function mountGoogleSignIn(
   target: HTMLElement,
@@ -103,13 +108,14 @@ export async function mountGoogleSignIn(
         return;
       }
 
-      const session = readClaims(credential);
-      if (!session) {
-        onError("Google returned a credential that could not be read");
-        return;
-      }
-
-      void saveSession(session).then(() => onSession(session));
+      void createSession(credential)
+        .then(async (session) => {
+          await saveSession(session);
+          onSession(session);
+        })
+        .catch((e: unknown) => {
+          onError(e instanceof Error ? e.message : String(e));
+        });
     },
   });
 

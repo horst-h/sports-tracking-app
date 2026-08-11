@@ -110,7 +110,7 @@ vi.mock("./db.ts", () => ({
 let signedIn = true;
 
 vi.mock("./googleSessionRepository.ts", () => ({
-  authHeader: async () => (signedIn ? { Authorization: "Bearer test" } : null),
+  hasSession: async () => signedIn,
 }));
 
 const { saveGoals, loadGoals } = await import("./goalsRepository.ts");

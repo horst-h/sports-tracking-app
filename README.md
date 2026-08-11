@@ -8,7 +8,7 @@ Eine React-basierte Sporttracking-App mit Runalyze als Datenquelle und Backend-P
 
 ### Features
 
-- Google Sign-In als App-Login (Identität für gespeicherte Ziele)
+- Google Sign-In als App-Login (Identität für gespeicherte Ziele), danach eine eigene Session für 90 Tage
 - Aktivitäten aus Runalyze über einen serverseitigen Proxy
 - Aktivitäten-Tracking (Laufen, Radfahren)
 - Jährliche Trainingsziele mit Backend-Persistenz
@@ -57,12 +57,25 @@ Die Goals API ermöglicht es, Trainingsziele pro Sportler im Backend zu persisti
 
 **Authentifizierung:**
 
-Alle Requests müssen ein gültiges Google ID Token im Authorization Header enthalten:
-```
-Authorization: Bearer <google_id_token>
-```
+Alle Requests laufen über die App-Session — ein HttpOnly-Cookie, das der Browser same-origin von selbst mitschickt. Siehe [Session](#session).
 
-Die Function verifiziert das Token lokal gegen Googles veröffentlichte Signaturschlüssel (Signatur, Issuer, Audience, Ablauf, verifizierte Mailadresse) und prüft das Konto gegen eine Allowlist. Ohne konfigurierte Allowlist wird niemand durchgelassen. Aus dem Subject entsteht der Storage-Key.
+Alternativ akzeptiert das Gate weiterhin ein Google ID Token im Authorization Header (`Authorization: Bearer <google_id_token>`). Das ist der Weg, über den `/session` überhaupt erst eine Session ausstellt.
+
+Google-Tokens werden lokal gegen Googles veröffentlichte Signaturschlüssel verifiziert (Signatur, Issuer, Audience, Ablauf, verifizierte Mailadresse), Session-Cookies gegen `SESSION_SECRET`. Beide Wege prüfen das Konto gegen dieselbe Allowlist — bei einem Cookie auf jedem Request, damit ein von der Liste genommenes Konto sofort draußen ist und nicht erst in 90 Tagen. Ohne konfigurierte Allowlist wird niemand durchgelassen. Aus dem Subject entsteht der Storage-Key.
+
+#### Session
+
+`POST|GET|DELETE /.netlify/functions/session`
+
+- `POST { idToken }` — tauscht ein Google ID Token gegen das Session-Cookie. Einmalig beim Login.
+- `GET` — meldet, wer angemeldet ist, und verlängert das Cookie, sobald es über die Hälfte seiner Laufzeit hinaus ist. Die App ruft das bei jedem Start auf; dadurch sind die 90 Tage ein gleitendes Fenster statt eines Countdowns.
+- `DELETE` — Logout.
+
+Ein Google ID Token lebt genau eine Stunde und lässt sich nicht erneuern — dieser Flow gibt kein Refresh-Token aus. Als Session verwendet, hieß das: stündlich neu anmelden. Es wird deshalb einmal benutzt und gegen ein serverseitig signiertes Token eingetauscht (HMAC-SHA256 über `SESSION_SECRET`, 90 Tage, gleitend).
+
+Das Cookie ist `HttpOnly; Secure; SameSite=Lax; Path=/`. `HttpOnly` ist der Grund, warum die lange Laufzeit vertretbar ist: die Seite kann das Token nicht lesen. `SameSite=Lax` ist der CSRF-Schutz — alle Endpoints authentifizieren jetzt per Cookie, und Lax gibt es nur bei Top-Level-Navigation heraus, die hier nichts verändert. `Secure` entfällt nur auf localhost, sonst würde der Browser das Cookie in der lokalen Entwicklung verwerfen.
+
+Im Browser liegt nur noch das Profil (Name, Mailadresse, Bild, Ablaufzeitpunkt) in IndexedDB — als Hinweis für die Oberfläche, damit die App offline und beim Start sofort angemeldet rendert. Entschieden wird nichts darauf; das tut ausschließlich die Serverprüfung des Cookies.
 
 **Storage:**
 
@@ -100,6 +113,9 @@ RUNALYZE_API_TOKEN=<personal-api-token>
 GOOGLE_CLIENT_ID=<oauth-client-id>        # serverseitig, für die Audience-Prüfung
 VITE_GOOGLE_CLIENT_ID=<oauth-client-id>   # im Browser, öffentlich
 ALLOWED_GOOGLE_EMAILS=<deine-mailadresse> # oder ALLOWED_GOOGLE_SUBS
+
+# App-Session (serverseitig, niemals VITE_-präfigiert)
+SESSION_SECRET=<mindestens 32 Zeichen>    # openssl rand -base64 48
 
 # optional: einmalige Übernahme der Ziele aus der Strava-Zeit
 LEGACY_GOALS_ATHLETE_ID=<strava-athlete-id>
@@ -149,6 +165,7 @@ Goals werden auch lokal gecacht für Offline-Nutzung und schnelle UI-Reaktion. D
 - Netlify Blobs als Storage
 - Runalyze API hinter einem Read-only-Proxy
 - Google ID Token Verifikation (lokal, gegen Googles JWKS)
+- App-Session als signiertes HttpOnly-Cookie (90 Tage, gleitend)
 
 **Storage Layers:**
 1. **Remote** (Netlify Blobs): Persistente Speicherung

@@ -1,5 +1,5 @@
 import type { RunalyzeActivity } from "./runalyzeTypes";
-import { authHeader } from "../../repositories/googleSessionRepository";
+import { hasSession } from "../../repositories/googleSessionRepository";
 
 /**
  * Talks to the Runalyze proxy, never to Runalyze itself.
@@ -7,7 +7,7 @@ import { authHeader } from "../../repositories/googleSessionRepository";
  * The browser cannot reach the API directly: only the custom `token` header
  * authenticates and the CORS preflight does not allow it. netlify/functions/
  * runalyze.ts holds the token and does the actual call — and only for a signed-in
- * athlete, which is why every request carries the Google session.
+ * athlete, whose session cookie the browser attaches to every request here.
  */
 const PROXY = "/.netlify/functions/runalyze";
 
@@ -17,11 +17,10 @@ async function getJson<T>(
   params: Record<string, string>,
   signal?: AbortSignal
 ): Promise<T> {
-  const headers = await authHeader();
-  if (!headers) throw new Error("Not signed in");
+  if (!(await hasSession())) throw new Error("Not signed in");
 
   const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`${PROXY}?${qs}`, { headers, signal });
+  const res = await fetch(`${PROXY}?${qs}`, { signal });
 
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as ProxyError;

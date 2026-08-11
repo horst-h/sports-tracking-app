@@ -59,8 +59,13 @@ function decodeSegment(segment: string): unknown {
  * to be *the* account. With no allowlist configured nobody passes: an
  * unconfigured deployment must be closed, not open to every Google user on the
  * internet.
+ *
+ * Exported because the app session is checked against it too, on every request
+ * rather than only at sign-in. A session outlives the ID token that created it
+ * by months, so an account taken off the list has to lose access now, not when
+ * its cookie happens to expire.
  */
-function isAllowed(identity: GoogleIdentity): boolean {
+export function isAllowed(identity: GoogleIdentity): boolean {
   const emails = (process.env.ALLOWED_GOOGLE_EMAILS ?? "")
     .split(",")
     .map((s) => s.trim().toLowerCase())

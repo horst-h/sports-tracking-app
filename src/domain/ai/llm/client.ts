@@ -3,20 +3,19 @@ import type { AiResponse } from "../contracts/aiResponse";
 // import { buildInsightsPrompt } from "./prompt"; // TODO: implement when LLM integration is needed
 import type { AiContext } from "../contracts/aiContext";
 import type { AnalyzeFacts, AnalyzeNarrative } from "../contracts/analyzeNarrative";
-import { authHeader } from "../../../repositories/googleSessionRepository";
+import { hasSession } from "../../../repositories/googleSessionRepository";
 
 /**
  * These endpoints spend real money on every call, so they are behind the same
- * sign-in as everything else. Sending the session is not optional: an
- * unauthenticated request is refused before it reaches the model.
+ * sign-in as everything else. An unauthenticated request is refused before it
+ * reaches the model, so one that is going to be refused is not sent at all.
  */
 async function postJson<T>(path: string, payload: unknown, label: string): Promise<T> {
-  const auth = await authHeader();
-  if (!auth) throw new Error("Not signed in");
+  if (!(await hasSession())) throw new Error("Not signed in");
 
   const res = await fetch(path, {
     method: "POST",
-    headers: { ...auth, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 

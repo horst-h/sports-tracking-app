@@ -1,6 +1,6 @@
 import { openSportsDB } from "./db.ts";
 import type { YearGoals, Sport, GoalMetric } from "../domain/metrics/types.ts";
-import { authHeader } from "./googleSessionRepository.ts";
+import { hasSession } from "./googleSessionRepository.ts";
 
 const STORE = "goals";
 
@@ -166,21 +166,17 @@ function unwrapDoc(year: number, raw: unknown): CachedGoals | null {
 const API_BASE = "/.netlify/functions/goals";
 
 /**
- * The goals API authenticates with the app's own Google session, not with the
- * activity source. Without one the app still works entirely from the local
- * cache — it just does not sync, and nothing local is ever discarded on the
- * strength of an answer we could not obtain.
+ * The goals API authenticates with the app's own session cookie, not with the
+ * activity source. Without a session the app still works entirely from the
+ * local cache — it just does not sync, and nothing local is ever discarded on
+ * the strength of an answer we could not obtain. Hence the `hasSession` guard
+ * in front of each call rather than a request sent to be refused.
  */
-async function getAuthHeader(): Promise<{ Authorization: string } | null> {
-  return authHeader();
-}
-
 async function fetchGoalFromBackend(year: number, sport: Sport): Promise<FetchResult> {
-  const auth = await getAuthHeader();
-  if (!auth) return { ok: false };
+  if (!(await hasSession())) return { ok: false };
 
   try {
-    const response = await fetch(`${API_BASE}?year=${year}&sport=${sport}`, { headers: auth });
+    const response = await fetch(`${API_BASE}?year=${year}&sport=${sport}`);
 
     if (!response.ok) {
       console.warn(`[GoalsRepository] Fetch failed (${year}/${sport}): HTTP ${response.status}`);
@@ -200,13 +196,12 @@ async function saveGoalToBackend(
   sport: Sport,
   goalData: GoalData
 ): Promise<RemoteGoal | null> {
-  const auth = await getAuthHeader();
-  if (!auth) return null;
+  if (!(await hasSession())) return null;
 
   try {
     const response = await fetch(API_BASE, {
       method: "PUT",
-      headers: { ...auth, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ year, sport, ...goalData }),
     });
 
@@ -224,13 +219,11 @@ async function saveGoalToBackend(
 }
 
 async function deleteGoalFromBackend(year: number, sport: Sport): Promise<boolean> {
-  const auth = await getAuthHeader();
-  if (!auth) return false;
+  if (!(await hasSession())) return false;
 
   try {
     const response = await fetch(`${API_BASE}?year=${year}&sport=${sport}`, {
       method: "DELETE",
-      headers: auth,
     });
 
     if (!response.ok) {
