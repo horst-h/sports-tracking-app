@@ -89,6 +89,22 @@ export const handler: Handler = async (event) => {
   const subject = auth.subject;
   console.info(`[Goals API] Authenticated subject: ${subject}`);
 
+  try {
+    return await handleRequest(event, subject);
+  } catch (error) {
+    // A storage failure is ours, and it is temporary. It must never leave here
+    // as 200 with an empty answer: the clients treat "no goal" as fact and
+    // erase their local copies to match, so a lapsed credential would delete
+    // the goals off every device that asked.
+    console.error("[Goals API] Storage unavailable:", error);
+    return json(503, { error: "storage_unavailable" });
+  }
+};
+
+async function handleRequest(
+  event: Parameters<Handler>[0],
+  subject: string
+): Promise<{ statusCode: number; headers: Record<string, string>; body: string }> {
   const store = createGoalsStore();
 
   // GET: Retrieve a goal
@@ -185,4 +201,4 @@ export const handler: Handler = async (event) => {
 
   console.warn(`[Goals API] Unsupported HTTP method: ${event.httpMethod}`);
   return json(405, { error: "method_not_allowed" });
-};
+}

@@ -26,6 +26,8 @@ type StoredGoal = {
 const backend = new Map<string, StoredGoal>();
 let clock = 0;
 let reachable = true;
+/** The backend answers, but its storage is down — a 503, never an empty 200. */
+let storageDown = false;
 
 /** Distinct, ordered timestamps — the backend's own `updatedAt` is what the
  *  clients compare against, so two writes must never share one. */
@@ -47,7 +49,23 @@ const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
   const params = new URLSearchParams(query ?? "");
   const method = init?.method ?? "GET";
 
-  const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
+  // The content type is part of the contract, not decoration: the client uses
+  // it to tell a real answer from the SPA catch-all serving index.html.
+  const ok = (body: unknown) => ({
+    ok: true,
+    status: 200,
+    headers: new Headers({ "content-type": "application/json" }),
+    json: async () => body,
+  });
+
+  if (storageDown) {
+    return {
+      ok: false,
+      status: 503,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ error: "storage_unavailable" }),
+    };
+  }
 
   if (method === "GET") {
     const key = backendKey(Number(params.get("year")), params.get("sport")!);
@@ -136,6 +154,7 @@ beforeEach(() => {
   devices.clear();
   clock = 0;
   reachable = true;
+  storageDown = false;
   signedIn = true;
   fetchMock.mockClear();
   on("desktop");
@@ -169,6 +188,57 @@ describe("goals sync across devices", () => {
       perSport: { run: { distanceKm: 300 }, ride: { distanceKm: 1500 } },
     });
     expect(await loadGoals(YEAR)).toMatchObject({ perSport: { ride: { distanceKm: 1500 } } });
+  });
+
+  it("keeps the goals when the backend's storage is down", async () => {
+    // How the goals actually went missing in production: the Blobs credential
+    // lapsed, every store read answered 401, and the API reported that as a
+    // perfectly ordinary 200 `{goal: null}`. Both devices believed the goals had
+    // been deleted elsewhere and erased their own copies to match, so the one
+    // place the values still existed lost them too.
+    //
+    // A backend that cannot reach its storage has to say so. Anything else and
+    // an expired token becomes data loss.
+    on("desktop");
+    await saveGoals(YEAR, goalsFor({ run: { distanceKm: 1103, count: 111 } }));
+
+    storageDown = true;
+
+    const fresh = vi.fn();
+    expect(await loadGoals(YEAR, fresh)).toMatchObject({
+      perSport: { run: { distanceKm: 1103, count: 111 } },
+    });
+    await settle();
+
+    expect(fresh).not.toHaveBeenCalled();
+
+    // And still there once the storage comes back, rather than a hole that got
+    // written through to the backend in the meantime.
+    storageDown = false;
+    expect(await loadGoals(YEAR)).toMatchObject({
+      perSport: { run: { distanceKm: 1103, count: 111 } },
+    });
+    expect(backend.get(backendKey(YEAR, "run"))).toMatchObject({ distanceKm: 1103, count: 111 });
+  });
+
+  it("does not delete a goal on the backend after a storage outage", async () => {
+    // The dangerous half: a device whose local copy was already emptied will
+    // push that emptiness as a DELETE the moment writes start working again.
+    on("desktop");
+    await saveGoals(YEAR, goalsFor({ run: { distanceKm: 1103 } }));
+
+    on("phone");
+    storageDown = true;
+    await loadGoals(YEAR);
+    await settle();
+    await saveGoals(YEAR, goalsFor({}));
+    await settle();
+
+    storageDown = false;
+    await loadGoals(YEAR);
+    await settle();
+
+    expect(backend.get(backendKey(YEAR, "run"))).toMatchObject({ distanceKm: 1103 });
   });
 
   it("syncs swimming goals", async () => {

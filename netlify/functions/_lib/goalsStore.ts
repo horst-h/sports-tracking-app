@@ -1,3 +1,4 @@
+import { getStore } from "@netlify/blobs";
 import type { StoredGoal, Sport } from "./types";
 
 /**
@@ -49,42 +50,30 @@ export class InMemoryGoalsStore implements GoalsStore {
  * Key pattern: goals/<subject>/<year>/<sport>
  */
 export class NetlifyBlobsGoalsStore implements GoalsStore {
-  private getStore: any;
   private store: any;
-  private storeOptions?: { siteID: string; token: string };
 
+  /**
+   * The store runs on the function's own Blobs context, with no credentials of
+   * ours anywhere near it.
+   *
+   * It used to pass `NETLIFY_SITE_ID` + `NETLIFY_AUTH_TOKEN` through by hand,
+   * and that is exactly how the goals went dark: a personal access token
+   * expires, every Blobs call started answering 401, and because the layers
+   * above read that as "there is no goal", the local copies were deleted to
+   * match. A credential the deployment does not hold cannot lapse. Explicit
+   * `BLOBS_SITE_ID` + `BLOBS_TOKEN` still override, for running this outside a
+   * Netlify runtime — but nothing is picked up ambiently any more.
+   */
   constructor() {
-    // Lazy-load @netlify/blobs
-    try {
-      const { getStore } = require("@netlify/blobs");
-      this.getStore = getStore;
+    const siteID = process.env.BLOBS_SITE_ID;
+    const token = process.env.BLOBS_TOKEN;
 
-      const siteID =
-        process.env.NETLIFY_SITE_ID ??
-        process.env.SITE_ID ??
-        process.env.BLOBS_SITE_ID;
-      const token =
-        process.env.NETLIFY_AUTH_TOKEN ??
-        process.env.NETLIFY_API_TOKEN ??
-        process.env.BLOBS_TOKEN;
-
-      if (siteID && token) {
-        this.storeOptions = { siteID, token };
-        console.info("[NetlifyBlobsGoalsStore] Using manual Blobs credentials from environment");
-      } else {
-        console.info("[NetlifyBlobsGoalsStore] Using runtime Blobs environment context (auto)");
-      }
-
-      // Eagerly create the store so missing environment is detected here,
-      // allowing factory fallback to in-memory store.
-      this.store = this.storeOptions
-        ? this.getStore("goals", this.storeOptions)
-        : this.getStore("goals");
-
-      console.info("[NetlifyBlobsGoalsStore] Initialized successfully");
-    } catch (error) {
-      console.error("[NetlifyBlobsGoalsStore] Initialization failed:", error);
-      throw new Error("Netlify Blobs initialization failed");
+    if (siteID && token) {
+      console.info("[NetlifyBlobsGoalsStore] Using explicit BLOBS_* credentials");
+      this.store = getStore("goals", { siteID, token });
+    } else {
+      console.info("[NetlifyBlobsGoalsStore] Using the runtime Blobs context");
+      this.store = getStore("goals");
     }
   }
 
@@ -103,17 +92,22 @@ export class NetlifyBlobsGoalsStore implements GoalsStore {
     return `goals/${athleteId}/${year}/${sport}`;
   }
 
+  /**
+   * Throws when the store cannot be reached, and returns null only when it
+   * answered and held nothing.
+   *
+   * The distinction is the whole point. This used to swallow the error and
+   * return null, which travelled up as HTTP 200 `{goal: null}` — an authoritative
+   * "you have no goal here" — and the clients dutifully erased their local
+   * copies to match. A store that cannot answer must not get to say what is in
+   * it.
+   */
   async get(subject: string, year: number, sport: Sport): Promise<StoredGoal | null> {
     const key = this.key(subject, year, sport);
-    try {
-      const json = await this.store.get(key, { type: "json" });
-      if (json) {
-        console.info(`[NetlifyBlobsGoalsStore] Retrieved goal: ${key}`);
-        return json;
-      }
-    } catch (error) {
-      console.error(`[NetlifyBlobsGoalsStore] Error retrieving goal: ${key}`, error);
-      return null;
+    const json = await this.store.get(key, { type: "json" });
+    if (json) {
+      console.info(`[NetlifyBlobsGoalsStore] Retrieved goal: ${key}`);
+      return json;
     }
 
     return this.adoptLegacy(subject, year, sport);
@@ -134,76 +128,45 @@ export class NetlifyBlobsGoalsStore implements GoalsStore {
     const legacyKey = this.legacyKey(year, sport);
     if (!legacyKey) return null;
 
-    try {
-      const legacy = await this.store.get(legacyKey, { type: "json" });
-      if (!legacy) return null;
+    const legacy = await this.store.get(legacyKey, { type: "json" });
+    if (!legacy) return null;
 
-      const adopted: StoredGoal = { ...legacy, subject, year, sport };
-      await this.store.setJSON(this.key(subject, year, sport), adopted);
-      console.info(`[NetlifyBlobsGoalsStore] Adopted ${legacyKey} as ${this.key(subject, year, sport)}`);
-      return adopted;
-    } catch (error) {
-      console.error(`[NetlifyBlobsGoalsStore] Could not adopt ${legacyKey}`, error);
-      return null;
-    }
+    const adopted: StoredGoal = { ...legacy, subject, year, sport };
+    await this.store.setJSON(this.key(subject, year, sport), adopted);
+    console.info(`[NetlifyBlobsGoalsStore] Adopted ${legacyKey} as ${this.key(subject, year, sport)}`);
+    return adopted;
   }
 
   async set(goal: StoredGoal): Promise<StoredGoal> {
     const key = this.key(goal.subject, goal.year, goal.sport);
-    try {
-      await this.store.setJSON(key, goal);
-      console.info(`[NetlifyBlobsGoalsStore] Saved goal: ${key}`);
-      return goal;
-    } catch (error) {
-      console.error(`[NetlifyBlobsGoalsStore] Error saving goal: ${key}`, error);
-      throw error;
-    }
+    await this.store.setJSON(key, goal);
+    console.info(`[NetlifyBlobsGoalsStore] Saved goal: ${key}`);
+    return goal;
   }
 
+  /** Throws rather than reporting a failed deletion as a completed one. */
   async delete(subject: string, year: number, sport: Sport): Promise<boolean> {
     const key = this.key(subject, year, sport);
-    try {
-      await this.store.delete(key);
-      console.info(`[NetlifyBlobsGoalsStore] Deleted goal: ${key}`);
-      return true;
-    } catch (error) {
-      // Previously referenced `key` from inside the try block, which threw a
-      // ReferenceError and masked the real failure.
-      console.error(`[NetlifyBlobsGoalsStore] Error deleting goal: ${key}`, error);
-      return false;
-    }
+    await this.store.delete(key);
+    console.info(`[NetlifyBlobsGoalsStore] Deleted goal: ${key}`);
+    return true;
   }
 }
 
 /**
- * Factory: creates the appropriate store based on environment.
+ * Creates the store, or throws.
+ *
+ * There is deliberately no fallback. Dropping to an in-memory store when Blobs
+ * cannot be reached reads as success at every layer above — writes are accepted,
+ * reads come back empty, and the goals quietly cease to exist. Only an explicit
+ * `GOALS_STORE=memory` gets a throwaway store, because that is someone asking
+ * for one.
  */
 export function createGoalsStore(): GoalsStore {
-  const forceMemory = process.env.GOALS_STORE === "memory";
-
-  console.info(
-    "[GoalsStore] Creating store - NETLIFY:",
-    process.env.NETLIFY,
-    "CONTEXT:",
-    process.env.CONTEXT,
-    "NODE_ENV:",
-    process.env.NODE_ENV,
-    "GOALS_STORE:",
-    process.env.GOALS_STORE
-  );
-
-  if (forceMemory) {
+  if (process.env.GOALS_STORE === "memory") {
     console.warn("[GoalsStore] ⚠️ GOALS_STORE=memory set - using in-memory store (NOT PERSISTED)");
     return new InMemoryGoalsStore();
   }
 
-  try {
-    console.info("[GoalsStore] Attempting to initialize Netlify Blobs store...");
-    const store = new NetlifyBlobsGoalsStore();
-    console.info("[GoalsStore] ✅ Successfully using Netlify Blobs for persistence");
-    return store;
-  } catch (error) {
-    console.error("[GoalsStore] ❌ Netlify Blobs initialization failed, falling back to in-memory (NOT PERSISTED):", error);
-    return new InMemoryGoalsStore();
-  }
+  return new NetlifyBlobsGoalsStore();
 }

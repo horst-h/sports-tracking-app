@@ -183,6 +183,16 @@ async function fetchGoalFromBackend(year: number, sport: Sport): Promise<FetchRe
       return { ok: false };
     }
 
+    // An undeployed function falls through to the SPA catch-all, which answers
+    // 200 with index.html. Read as JSON that throws, and the throw would be
+    // caught below and reported as "we could not ask" — true, but for a reason
+    // worth naming rather than guessing at.
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) {
+      console.warn(`[GoalsRepository] Non-JSON answer (${year}/${sport}) — is the function deployed?`);
+      return { ok: false };
+    }
+
     const data = await response.json();
     return { ok: true, goal: (data.goal as RemoteGoal | null) ?? null };
   } catch (error) {
