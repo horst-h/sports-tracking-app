@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import type { GoalMetric, Sport, YearGoals } from "../domain/metrics/types";
+import type { GoalMetric, Sport } from "../domain/metrics/types";
+import { applyGoalEdits, NO_GOAL_EDITS, withGoalEdit, type GoalEdits } from "./goalEdits";
 import { useGoals } from "../hooks/useGoals";
 import { useActivities } from "../hooks/useActivities";
 import { useDataAccess } from "../hooks/useDataAccess";
@@ -47,10 +48,6 @@ const GOAL_FIELDS: Array<{
   },
 ];
 
-function emptyGoals(year: number): YearGoals {
-  return { year, perSport: { run: {}, ride: {}, swim: {} } };
-}
-
 export default function GoalsScreen() {
   const navigate = useNavigate();
   const year = new Date().getFullYear();
@@ -64,16 +61,23 @@ export default function GoalsScreen() {
   /** A save that only reached this device. Worth saying out loud — silence here
    *  reads as "saved everywhere" and is how two devices drift apart unnoticed. */
   const [savedLocallyOnly, setSavedLocallyOnly] = useState(false);
-  const [goalOverridesBySport, setGoalOverridesBySport] = useState<
-    Record<Sport, Partial<Record<GoalMetric, number | undefined>>>
-  >({ run: {}, ride: {}, swim: {} });
+  const [edits, setEdits] = useState<GoalEdits>(NO_GOAL_EDITS);
 
-  const currentGoals = useMemo<Partial<Record<GoalMetric, number>>>(() => {
-    if (!goals) return {};
-    const baseGoals = goals.perSport?.[selectedSport] ?? {};
-    const overrides = goalOverridesBySport[selectedSport];
-    return { ...baseGoals, ...overrides };
-  }, [goals, selectedSport, goalOverridesBySport]);
+  /**
+   * What the athlete is actually looking at: the loaded goals with this
+   * session's edits merged in. Everything on this screen reads from here, and
+   * so does every save — a save built from `goals` alone would be built from a
+   * snapshot taken before the last three fields were filled in.
+   */
+  const editedGoals = useMemo(
+    () => applyGoalEdits(goals, edits, year),
+    [goals, edits, year]
+  );
+
+  const currentGoals = useMemo<Partial<Record<GoalMetric, number>>>(
+    () => editedGoals.perSport?.[selectedSport] ?? {},
+    [editedGoals, selectedSport]
+  );
 
   const statsBySport = useMemo((): Record<Sport, UiAthleteStats> | null => {
     if (!activities || !ready) return null;
@@ -85,7 +89,9 @@ export default function GoalsScreen() {
 
     function buildForSport(s: Sport) {
       const agg = aggregateYear(normalized, year, s, asOfLocalIso);
-      const sportGoals = goals?.perSport?.[s];
+      // The edited goals, so progress and the coach react to a number the
+      // moment it is entered rather than after the next reload.
+      const sportGoals = editedGoals.perSport?.[s];
       return buildUiAthleteStats({
         aggregate: agg,
         asOfDateLocal: asOfLocalIso,
@@ -101,30 +107,20 @@ export default function GoalsScreen() {
       ride: buildForSport("ride"),
       swim: buildForSport("swim"),
     };
-  }, [activities, goals, year, ready]);
+  }, [activities, editedGoals, year, ready]);
 
   const otherSport: Sport = selectedSport === "run" ? "ride" : "run";
   const stats = statsBySport ? statsBySport[selectedSport] : null;
   const otherStats = statsBySport ? statsBySport[otherSport] : null;
 
   async function saveGoalField(metric: GoalMetric, value: number | undefined) {
-    const base = goals ?? emptyGoals(year);
-    const perSport = { ...base.perSport };
-    const currentSport = { ...(perSport[selectedSport] ?? {}) } as Record<GoalMetric, number>;
+    // Recorded before the save, not after it. The edit is what the next save
+    // has to build on, and awaiting a round trip first is how two fields filled
+    // in quick succession both start from the same stale base.
+    const nextEdits = withGoalEdit(edits, selectedSport, metric, value);
+    setEdits(nextEdits);
 
-    if (typeof value === "number") {
-      currentSport[metric] = value;
-    } else {
-      delete currentSport[metric];
-    }
-
-    perSport[selectedSport] = currentSport;
-
-    const payload: YearGoals = {
-      ...base,
-      year,
-      perSport,
-    };
+    const payload = applyGoalEdits(goals, nextEdits, year);
 
     const savePromise = goalsRepo.saveGoals(year, payload);
     const tracked = savePromise.then(() => {});
@@ -135,18 +131,6 @@ export default function GoalsScreen() {
     }
 
     setSavedLocallyOnly(!result.synced);
-
-    setGoalOverridesBySport((prev) => {
-      const next = { ...prev };
-      const sportOverrides = { ...(next[selectedSport] ?? {}) };
-      if (typeof value === "number") {
-        sportOverrides[metric] = value;
-      } else {
-        delete sportOverrides[metric];
-      }
-      next[selectedSport] = sportOverrides;
-      return next;
-    });
   }
 
   async function handleBack() {
