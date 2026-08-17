@@ -1,6 +1,6 @@
 import type { GoalTrendChartData, MonthPerformance } from "../components/chart/GoalTrendChartCore";
 
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /**
  * How far a month may sit from the required monthly average and still count as
