@@ -25,6 +25,7 @@ import { useAthlete } from "./hooks/useAthlete";
 import { useDataAccess } from "./hooks/useDataAccess";
 import * as goalsRepo from "./repositories/goalsRepository";
 import { clearToken } from "./repositories/tokenRepository";
+import { initialsFrom } from "./utils/initials";
 
 // Type for stats with optional forecasts
 type StatsWithForecasts = UiAthleteStats & {
@@ -98,7 +99,7 @@ export default function App() {
   const [goalsRefreshTrigger, setGoalsRefreshTrigger] = useState(0);
 
   // Auth check (MUST be before conditional return)
-  const { ready, needsLogin, signIn, signOut } = useDataAccess();
+  const { ready, needsLogin, signIn, signOut, session } = useDataAccess();
 
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -273,8 +274,11 @@ export default function App() {
           title="still moving"
           syncStatus={syncStatus}
           lastSync={lastSync}
-          avatarText="HH"
-          avatarImage={athlete?.avatarUrl}
+          avatarText={initialsFrom(session?.name, session?.email)}
+          // Google knows who the athlete is; Runalyze has no identity endpoint
+          // at all and its provider returns no avatar. The fallback is kept for
+          // a source that does offer one.
+          avatarImage={session?.picture ?? athlete?.avatarUrl}
           onAvatarClick={() => setSettingsOpen(true)}
         />
         <SportSwitcher value={sport} onChange={handleSportChange} />

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import DataStatus from './DataStatus';
 
 type SyncStatus = 'idle' | 'syncing' | 'error';
@@ -19,6 +20,18 @@ export default function AppHeader({
   avatarImage,
   onAvatarClick,
 }: AppHeaderProps) {
+  /**
+   * An avatar that will not load falls back to the initials rather than to a
+   * broken-image icon. It is a remote URL on an app built to work offline, so
+   * this is the ordinary case on a plane, not an edge case.
+   *
+   * Remembering which URL failed rather than a bare "it failed" is what lets a
+   * later, different picture be tried: there is nothing to reset.
+   */
+  const [failedImage, setFailedImage] = useState<string | null>(null);
+
+  const showImage = !!avatarImage && avatarImage !== failedImage;
+
   return (
     <header className="app-header" role="banner">
       <div className="app-header__inner">
@@ -31,11 +44,15 @@ export default function AppHeader({
         </div>
 
         <button className="avatar" type="button" aria-label="Open profile" onClick={onAvatarClick}>
-          {avatarImage ? (
+          {showImage ? (
             <img
               src={avatarImage}
               alt="Profile"
               className="avatar__image"
+              // Google serves these from lh3.googleusercontent.com and refuses
+              // some requests that carry a referrer.
+              referrerPolicy="no-referrer"
+              onError={() => setFailedImage(avatarImage)}
             />
           ) : (
             <span className="avatar__fallback" aria-hidden="true">
