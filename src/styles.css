@@ -261,6 +261,63 @@ body {
   color: var(--text-muted);
 }
 
+/* Refresh and avatar travel together at the right edge, close to each other
+   rather than pushed apart by the header's space-between. */
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.header-refresh {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.header-refresh:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.header-refresh:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.header-refresh:focus-visible {
+  outline: 2px solid var(--accent-green);
+  outline-offset: 2px;
+}
+
+.header-refresh__icon--spinning {
+  animation: headerRefreshSpin 900ms linear infinite;
+}
+
+@keyframes headerRefreshSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A spinner is decoration; someone who asked for less motion still needs to
+   see that the button is busy, which the disabled state already conveys. */
+@media (prefers-reduced-motion: reduce) {
+  .header-refresh__icon--spinning {
+    animation: none;
+  }
+}
+
 /* ----- Sport selection (pill-style segmented control) ----- */
 .sport-switcher {
   width: 100%;

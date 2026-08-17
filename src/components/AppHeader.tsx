@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import DataStatus from './DataStatus';
 
 type SyncStatus = 'idle' | 'syncing' | 'error';
@@ -10,6 +11,8 @@ type AppHeaderProps = {
   avatarText: string;     // "RV"
   avatarImage?: string;   // URL to profile image (optional)
   onAvatarClick?: () => void;
+  /** Omitted where there is nothing to refresh; the button is then not rendered. */
+  onRefresh?: () => void;
 };
 
 export default function AppHeader({
@@ -19,6 +22,7 @@ export default function AppHeader({
   avatarText,
   avatarImage,
   onAvatarClick,
+  onRefresh,
 }: AppHeaderProps) {
   /**
    * An avatar that will not load falls back to the initials rather than to a
@@ -43,23 +47,45 @@ export default function AppHeader({
           <DataStatus status={syncStatus} lastSync={lastSync} />
         </div>
 
-        <button className="avatar" type="button" aria-label="Open profile" onClick={onAvatarClick}>
-          {showImage ? (
-            <img
-              src={avatarImage}
-              alt="Profile"
-              className="avatar__image"
-              // Google serves these from lh3.googleusercontent.com and refuses
-              // some requests that carry a referrer.
-              referrerPolicy="no-referrer"
-              onError={() => setFailedImage(avatarImage)}
-            />
-          ) : (
-            <span className="avatar__fallback" aria-hidden="true">
-              {avatarText}
-            </span>
+        <div className="app-header__actions">
+          {/* The only way to force a sync with a mouse: pull-to-refresh ignores
+              mouse events by design, and a page reload re-reads the same cache
+              rather than asking the server. */}
+          {onRefresh && (
+            <button
+              type="button"
+              className="header-refresh"
+              onClick={onRefresh}
+              disabled={syncStatus === 'syncing'}
+              aria-label={syncStatus === 'syncing' ? 'Syncing' : 'Refresh data'}
+              title="Refresh data"
+            >
+              <RefreshCw
+                size={16}
+                aria-hidden="true"
+                className={syncStatus === 'syncing' ? 'header-refresh__icon--spinning' : undefined}
+              />
+            </button>
           )}
-        </button>
+
+          <button className="avatar" type="button" aria-label="Open profile" onClick={onAvatarClick}>
+            {showImage ? (
+              <img
+                src={avatarImage}
+                alt="Profile"
+                className="avatar__image"
+                // Google serves these from lh3.googleusercontent.com and refuses
+                // some requests that carry a referrer.
+                referrerPolicy="no-referrer"
+                onError={() => setFailedImage(avatarImage)}
+              />
+            ) : (
+              <span className="avatar__fallback" aria-hidden="true">
+                {avatarText}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
     </header>
   );

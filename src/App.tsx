@@ -280,6 +280,7 @@ export default function App() {
           // a source that does offer one.
           avatarImage={session?.picture ?? athlete?.avatarUrl}
           onAvatarClick={() => setSettingsOpen(true)}
+          onRefresh={handleRefresh}
         />
         <SportSwitcher value={sport} onChange={handleSportChange} />
       </div>
