@@ -1,43 +1,51 @@
 import { describe, expect, it } from "vitest";
 import { initialsFrom } from "./initials";
 
+/**
+ * The fixtures are deliberately invented people at example.com.
+ *
+ * A real address here is the allowlist this deployment authenticates against,
+ * and putting it in a test file commits it to the repository — which is exactly
+ * what Netlify's secrets scanner blocked the build over.
+ */
+
 describe("initialsFrom", () => {
   it("takes the first and last name", () => {
-    expect(initialsFrom("Horst Haag")).toBe("HH");
+    expect(initialsFrom("Ada Lovelace")).toBe("AL");
   });
 
   it("skips middle names rather than cramming them in", () => {
-    expect(initialsFrom("Horst Werner Haag")).toBe("HH");
+    expect(initialsFrom("Ada Augusta Lovelace")).toBe("AL");
   });
 
   it("gives one letter for a single name", () => {
-    expect(initialsFrom("Horst")).toBe("H");
+    expect(initialsFrom("Ada")).toBe("A");
   });
 
   it("uppercases what it finds", () => {
-    expect(initialsFrom("horst haag")).toBe("HH");
+    expect(initialsFrom("ada lovelace")).toBe("AL");
   });
 
   it("copes with stray whitespace", () => {
-    expect(initialsFrom("  Horst   Haag  ")).toBe("HH");
+    expect(initialsFrom("  Ada   Lovelace  ")).toBe("AL");
   });
 
   it("falls back to the email when there is no name", () => {
-    expect(initialsFrom(undefined, "horst.haag@googlemail.com")).toBe("HH");
+    expect(initialsFrom(undefined, "ada.lovelace@example.com")).toBe("AL");
   });
 
   it("reads the usual separators in an address", () => {
-    expect(initialsFrom("", "horst_haag@example.com")).toBe("HH");
-    expect(initialsFrom("", "horst-haag@example.com")).toBe("HH");
-    expect(initialsFrom("", "horst+tag@example.com")).toBe("HT");
+    expect(initialsFrom("", "ada_lovelace@example.com")).toBe("AL");
+    expect(initialsFrom("", "ada-lovelace@example.com")).toBe("AL");
+    expect(initialsFrom("", "ada+tag@example.com")).toBe("AT");
   });
 
   it("gives one letter for an address with nothing to split on", () => {
-    expect(initialsFrom(undefined, "horst@example.com")).toBe("H");
+    expect(initialsFrom(undefined, "ada@example.com")).toBe("A");
   });
 
   it("prefers the name over the address", () => {
-    expect(initialsFrom("Ada Lovelace", "horst.haag@example.com")).toBe("AL");
+    expect(initialsFrom("Grace Hopper", "ada.lovelace@example.com")).toBe("GH");
   });
 
   it("falls back when there is nothing to go on", () => {

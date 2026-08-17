@@ -34,8 +34,8 @@ export function initialsFrom(name?: string, email?: string, fallback = "?"): str
   const fromName = fromParts(nameParts);
   if (fromName) return fromName.toUpperCase();
 
-  // "horst.haag@…" carries the same two initials as often as not, and beats a
-  // question mark when the profile came back without a name.
+  // A "first.last@" address carries the same two initials as often as not, and
+  // beats a question mark when the profile came back without a name.
   const local = (email ?? "").trim().split("@")[0] ?? "";
   const fromEmail = fromParts(local.split(/[._\-+]/).filter(Boolean));
   if (fromEmail) return fromEmail.toUpperCase();
