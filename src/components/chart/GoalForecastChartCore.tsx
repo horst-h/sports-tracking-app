@@ -129,6 +129,9 @@ function CustomTooltip({
   );
 }
 
+/** Headroom above the plot, where the goal marker's date label sits. */
+const CHART_MARGIN_TOP = 26;
+
 const GOAL_ICON_SIZE = 13;
 /** Rough advance width of the bold 11px label font — enough to centre a short date. */
 const GOAL_LABEL_CHAR_WIDTH = 6.3;
@@ -137,21 +140,32 @@ const GOAL_LABEL_CHAR_WIDTH = 6.3;
  * Date the goal is met, flagged so the marker says what it marks without
  * needing the legend. Recharts hands a vertical ReferenceLine's label the line
  * itself as its viewBox, so x is the line and y its top end.
+ *
+ * `side` moves the whole group to one side of the line instead of straddling
+ * it. Centred is what reads best, but a crossing in the first or last weeks of
+ * the year would hang the label over the chart's edge.
  */
 function GoalDateLabel({
   viewBox,
   text,
+  side = "center",
 }: {
   viewBox?: { x?: number; y?: number };
   text: string;
+  side?: "left" | "center" | "right";
 }) {
   const lineX = Number(viewBox?.x);
   const lineTop = Number(viewBox?.y);
   if (!Number.isFinite(lineX) || !Number.isFinite(lineTop)) return null;
 
   const baseline = lineTop - 6;
-  const textWidth = text.length * GOAL_LABEL_CHAR_WIDTH;
-  const iconX = lineX - (textWidth + GOAL_ICON_SIZE) / 2;
+  const groupWidth = GOAL_ICON_SIZE + 3 + text.length * GOAL_LABEL_CHAR_WIDTH;
+  const iconX =
+    side === "left"
+      ? lineX - groupWidth - 4
+      : side === "right"
+        ? lineX + 4
+        : lineX - groupWidth / 2;
 
   return (
     <g>
@@ -195,6 +209,11 @@ function ForecastEndLabel({
   const cy = Number(y);
   if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null;
 
+  // A projection that ends just under the axis top would put this label in the
+  // headroom the goal marker's date already occupies — drop below the point
+  // instead. Both only ever compete when the goal is met in late December.
+  const clearsDateLabel = cy - CHART_MARGIN_TOP >= 28;
+
   return (
     <g>
       <circle cx={cx} cy={cy} r={3.5} fill={color} />
@@ -202,7 +221,7 @@ function ForecastEndLabel({
           and the grid run straight through where this label sits. */}
       <text
         x={cx}
-        y={cy - 11}
+        y={clearsDateLabel ? cy - 11 : cy + 16}
         textAnchor="end"
         fontSize={11}
         fontWeight={700}
@@ -277,11 +296,26 @@ export default function GoalForecastChartCore({ chart, formatValue, formatTick }
     ? `${goalCrossing.date.getDate()} ${MONTH_LABELS[goalCrossing.date.getMonth()]}`
     : null;
 
+  // A crossing in the closing or opening weeks of the year leaves no room for a
+  // centred label. The month index says which edge it is near without needing
+  // the plot's pixel bounds, which the label renderer never sees.
+  const crossingLabelSide =
+    goalCrossing == null
+      ? "center"
+      : goalCrossing.x > 10.3
+        ? "left"
+        : goalCrossing.x < 0.7
+          ? "right"
+          : "center";
+
   return (
     <div style={{ marginTop: 16 }}>
       <div style={{ width: "100%", height: 220 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={points} margin={{ top: 26, right: 16, left: 16, bottom: 4 }}>
+          <LineChart
+            data={points}
+            margin={{ top: CHART_MARGIN_TOP, right: 16, left: 16, bottom: 4 }}
+          >
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             {/* Numeric rather than category, so the goal marker can stand between
                 two months instead of snapping to the nearest one. */}
@@ -326,7 +360,7 @@ export default function GoalForecastChartCore({ chart, formatValue, formatTick }
                 stroke={GOAL_LINE_COLOR}
                 strokeWidth={1.5}
                 strokeDasharray="4 4"
-                label={<GoalDateLabel text={crossingDate ?? ""} />}
+                label={<GoalDateLabel text={crossingDate ?? ""} side={crossingLabelSide} />}
               />
             )}
 
@@ -387,23 +421,29 @@ export default function GoalForecastChartCore({ chart, formatValue, formatTick }
         <LegendItem swatch={<LineSwatch color={GOAL_LINE_COLOR} dashArray="5 4" />}>
           Goal · {formatValue(goal)}
         </LegendItem>
-        {goalCrossing && (
-          <LegendItem
-            swatch={
-              <Flag
-                size={13}
-                color={GOAL_LINE_COLOR}
-                strokeWidth={2.5}
-                style={{ flexShrink: 0 }}
-                aria-hidden="true"
-              />
-            }
-          >
-            {goalCrossing.isProjection ? "Goal date · " : "Goal reached · "}
-            {crossingDate}
-            {goalCrossing.isProjection && " (projected)"}
-          </LegendItem>
-        )}
+        {/* Stated either way: without this line, a year that never reaches its
+            goal is only signalled by a marker that isn't there. */}
+        <LegendItem
+          swatch={
+            <Flag
+              size={13}
+              color={goalCrossing ? GOAL_LINE_COLOR : "var(--text-light)"}
+              strokeWidth={2.5}
+              style={{ flexShrink: 0 }}
+              aria-hidden="true"
+            />
+          }
+        >
+          {goalCrossing ? (
+            <>
+              {goalCrossing.isProjection ? "Goal date · " : "Goal reached · "}
+              {crossingDate}
+              {goalCrossing.isProjection && " (projected)"}
+            </>
+          ) : (
+            "Goal date · not this year"
+          )}
+        </LegendItem>
       </div>
     </div>
   );
