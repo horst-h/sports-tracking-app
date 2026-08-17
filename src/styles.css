@@ -1116,6 +1116,14 @@ body {
 .rounded-8 { border-radius: 8px; }
 .rounded-12 { border-radius: 12px; }
 
+/* Something is wrong but nothing is lost — the same amber the off-track badges
+   use, which until now was pasted inline wherever it was needed. */
+.notice-warning {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #92400e;
+}
+
 /* Colors & Text */
 .text-error { color: crimson; }
 .text-muted { opacity: 0.7; }

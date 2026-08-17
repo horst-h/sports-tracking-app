@@ -11,6 +11,18 @@ import { endSession, refreshSession, SessionUnavailable } from "../services/appS
 export type SessionStatus = "checking" | "signed-in" | "signed-out";
 
 /**
+ * What the server had to say about the stored session, as opposed to what this
+ * device believes about it.
+ *
+ * Kept apart from `status` on purpose. Status answers "do we render a signed-in
+ * interface", and offline that has to stay yes. This answers "has anyone
+ * actually confirmed it", and offline that is no — a distinction the app was
+ * missing entirely, so a deployment that could authenticate nobody still looked
+ * completely normal while every request behind it failed.
+ */
+export type SessionCheck = "pending" | "confirmed" | "unreachable" | "server-error";
+
+/**
  * The app's own login, independent of any activity source.
  *
  * Both the goals store and the Runalyze proxy hand out personal data and both
@@ -26,6 +38,7 @@ export type SessionStatus = "checking" | "signed-in" | "signed-out";
 export function useGoogleSession() {
   const [session, setSession] = useState<GoogleSession | null>(null);
   const [status, setStatus] = useState<SessionStatus>("checking");
+  const [check, setCheck] = useState<SessionCheck>("pending");
 
   useEffect(() => {
     let cancelled = false;
@@ -49,15 +62,22 @@ export function useGoogleSession() {
           await clearSession();
           setSession(null);
           setStatus("signed-out");
+          setCheck("confirmed"); // A clean 401 is an answer, not a failure.
           return;
         }
 
         await saveSession(confirmed);
-        if (!cancelled) setSession(confirmed);
+        if (cancelled) return;
+        setSession(confirmed);
+        setCheck("confirmed");
       } catch (e) {
-        // Unreachable is not rejected. Keep the stored session; the next
-        // request that actually needs the server will surface a real 401.
+        // Unconfirmed is not signed out: the session stays either way, because
+        // this app is meant to work with no network at all. What changes is
+        // that the app now knows it is running on an unverified session and can
+        // say so, instead of presenting itself as fully signed in while every
+        // request behind it quietly fails.
         if (!(e instanceof SessionUnavailable)) throw e;
+        if (!cancelled) setCheck(e.reason === "unreachable" ? "unreachable" : "server-error");
       }
     })();
 
@@ -69,6 +89,9 @@ export function useGoogleSession() {
   const signIn = useCallback((next: GoogleSession) => {
     setSession(next);
     setStatus("signed-in");
+    // This session came from /session a moment ago, which is the server
+    // confirming it in the strongest sense available: it just minted it.
+    setCheck("confirmed");
   }, []);
 
   const signOut = useCallback(async () => {
@@ -77,7 +100,8 @@ export function useGoogleSession() {
     await disableAutoSelect();
     setSession(null);
     setStatus("signed-out");
+    setCheck("pending");
   }, []);
 
-  return { session, status, signIn, signOut };
+  return { session, status, check, signIn, signOut };
 }

@@ -12,8 +12,28 @@ const ENDPOINT = "/.netlify/functions/session";
 
 type SessionResponse = { session?: GoogleSession };
 
+/**
+ * Why the session could not be confirmed.
+ *
+ * `unreachable` is an offline app behaving normally and must never cost anyone
+ * their session. `server` is the opposite situation wearing the same clothes:
+ * the server answered, and the answer was unusable — a missing SESSION_SECRET,
+ * an undeployed function, a 5xx. Collapsing the two is how a deployment that
+ * cannot authenticate anybody still renders as signed in, with every request
+ * behind it failing quietly.
+ */
+export type UnavailableReason = "unreachable" | "server";
+
 /** Distinguishes "the server said no" from "the server could not be reached". */
-export class SessionUnavailable extends Error {}
+export class SessionUnavailable extends Error {
+  readonly reason: UnavailableReason;
+
+  constructor(message: string, reason: UnavailableReason) {
+    super(message);
+    this.name = "SessionUnavailable";
+    this.reason = reason;
+  }
+}
 
 async function readSession(res: Response): Promise<GoogleSession> {
   // An undeployed function falls through to the SPA catch-all, which answers
@@ -66,16 +86,19 @@ export async function refreshSession(): Promise<GoogleSession | null> {
   try {
     res = await fetch(ENDPOINT, { method: "GET", headers: { accept: "application/json" } });
   } catch (e) {
-    throw new SessionUnavailable(e instanceof Error ? e.message : String(e));
+    // The only genuinely offline branch: the request never got an answer.
+    throw new SessionUnavailable(e instanceof Error ? e.message : String(e), "unreachable");
   }
 
   if (res.status === 401) return null;
-  if (!res.ok) throw new SessionUnavailable(`Session check failed (HTTP ${res.status})`);
+  if (!res.ok) throw new SessionUnavailable(`Session check failed (HTTP ${res.status})`, "server");
 
   try {
     return await readSession(res);
   } catch (e) {
-    throw new SessionUnavailable(e instanceof Error ? e.message : String(e));
+    // The server answered; the answer was not one we can use. Being connected
+    // and being able to authenticate are not the same thing.
+    throw new SessionUnavailable(e instanceof Error ? e.message : String(e), "server");
   }
 }
 

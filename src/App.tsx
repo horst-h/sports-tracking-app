@@ -99,7 +99,7 @@ export default function App() {
   const [goalsRefreshTrigger, setGoalsRefreshTrigger] = useState(0);
 
   // Auth check (MUST be before conditional return)
-  const { ready, needsLogin, signIn, signOut, session } = useDataAccess();
+  const { ready, needsLogin, signIn, signOut, session, check } = useDataAccess();
 
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -285,6 +285,16 @@ export default function App() {
       </div>
 
       <main className="container" role="main" style={{ paddingTop: "0.5rem" }}>
+        {/* The server was reachable and would not confirm the session. Not
+            offline — offline says nothing, because offline is expected here. */}
+        {check === "server-error" && (
+          <p role="status" className="mt-16 notice-warning">
+            Signed in on this device, but the server would not confirm it. What you
+            see may be out of date, and changes may not be saved anywhere else.
+            Signing out and back in usually resolves it.
+          </p>
+        )}
+
         {loading && <p className="mt-16">Loading activities…</p>}
         {error && (
           <p className="mt-16 text-error">

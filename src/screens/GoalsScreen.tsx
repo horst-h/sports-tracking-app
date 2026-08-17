@@ -179,11 +179,7 @@ export default function GoalsScreen() {
         </p>
 
         {savedLocallyOnly && (
-          <p
-            role="status"
-            // Same amber the off-track badges use; there is no token for it.
-            style={{ fontSize: "0.875rem", color: "#92400e", marginTop: "0.5rem" }}
-          >
+          <p role="status" className="notice-warning" style={{ marginTop: "0.5rem" }}>
             Saved on this device only — not synced yet. It will be sent the next time
             the app can reach the server while you are signed in.
           </p>

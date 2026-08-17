@@ -21,7 +21,7 @@ const { NetlifyBlobsGoalsStore, InMemoryGoalsStore, createGoalsStore } = await i
   "./goalsStore.ts"
 );
 
-const SUBJECT = "google:105969412379559801531";
+const SUBJECT = "google:100000000000000000001";
 const DOWN = new Error("Netlify Blobs has generated an internal error (401 status code)");
 
 beforeEach(() => {
@@ -83,7 +83,7 @@ describe("NetlifyBlobsGoalsStore", () => {
     // Netlify sets for other purposes and that expires on its own schedule;
     // authenticating Blobs with it made the goals hostage to that schedule.
     process.env.NETLIFY_AUTH_TOKEN = "expired-personal-access-token";
-    process.env.NETLIFY_SITE_ID = "ae234628-b2bc-4936-ac67-368d3b5df55d";
+    process.env.NETLIFY_SITE_ID = "00000000-0000-4000-8000-000000000000";
 
     new NetlifyBlobsGoalsStore();
 
