@@ -1,14 +1,34 @@
-import type { GoalTrendChartData } from "../components/chart/GoalTrendChartCore";
+import type { GoalTrendChartData, MonthPerformance } from "../components/chart/GoalTrendChartCore";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /**
- * Builds chart data for the goal trend visualization with average lines
+ * How far a month may sit from the required monthly average and still count as
+ * "on target". Without a band, hitting the required average exactly would be the
+ * only way to be green, so every month would read as either below or above.
+ */
+export const REQUIRED_TOLERANCE = 0.05;
+
+function classifyMonth(value: number, lowerBound: number, upperBound: number): MonthPerformance {
+  if (value > upperBound) return "above";
+  if (value >= lowerBound) return "onTarget";
+  return "below";
+}
+
+/**
+ * Builds chart data for the goal trend visualization.
+ *
+ * The benchmark every month is judged against is the *required* monthly average
+ * — the pace that reaches the yearly goal, i.e. goal / 12. That is deliberately
+ * a fixed value rather than "what is still needed from here on": a benchmark
+ * that moves with the remaining months would repaint the already-finished bars
+ * every time a new activity lands.
+ *
  * @param monthlyActuals Array of 12 monthly values (index 0-11 = Jan-Dec)
  * @param yearlyGoal The goal value for the entire year
  * @param selectedYear The year being displayed
  * @param currentDate The current date (for determining which months to show bars)
- * @returns Chart data with monthly bars and average lines
+ * @returns Chart data with monthly bars, per-month rating and the two average lines
  */
 export function buildGoalTrendChartData(params: {
   monthlyActuals: number[];
@@ -32,8 +52,10 @@ export function buildGoalTrendChartData(params: {
   const isCurrentYear = selectedYear === currentYear;
   const monthsWithBars = isCurrentYear ? currentMonthIndex + 1 : 12;
 
-  // Calculate averages
-  const planAvgMonthly = yearlyGoal / 12;
+  // The pace that reaches the goal, and the band that still counts as on target.
+  const requiredAvgMonthly = yearlyGoal / 12;
+  const requiredLowerBound = requiredAvgMonthly * (1 - REQUIRED_TOLERANCE);
+  const requiredUpperBound = requiredAvgMonthly * (1 + REQUIRED_TOLERANCE);
 
   // For actual average: calculate based on months that have passed
   let actualSum = 0;
@@ -43,11 +65,17 @@ export function buildGoalTrendChartData(params: {
   const actualAvgMonthly = monthsWithBars > 0 ? actualSum / monthsWithBars : 0;
 
   // Determine line status
-  const isOnTrack = actualAvgMonthly >= planAvgMonthly;
+  const isOnTrack = actualAvgMonthly >= requiredAvgMonthly;
 
-  // Calculate plan bounds for ±5% range
-  const planLowerBound = planAvgMonthly * 0.95;
-  const planUpperBound = planAvgMonthly * 1.05;
+  // Best month among the ones that actually have a bar. Ties go to the earlier
+  // month; a year without a single recorded month gets no badge at all.
+  let bestMonthIndex = -1;
+  for (let i = 0; i < monthsWithBars; i++) {
+    if (monthlyActuals[i] <= 0) continue;
+    if (bestMonthIndex === -1 || monthlyActuals[i] > monthlyActuals[bestMonthIndex]) {
+      bestMonthIndex = i;
+    }
+  }
 
   // Build chart data for all 12 months
   const chartData: GoalTrendChartData[] = [];
@@ -60,10 +88,13 @@ export function buildGoalTrendChartData(params: {
       month: MONTH_LABELS[i],
       monthIndex: i,
       monthlyActual: monthlyBar,
-      planAvgMonthly,
-      planLowerBound,
-      planUpperBound,
+      requiredAvgMonthly,
+      requiredLowerBound,
+      requiredUpperBound,
       actualAvgMonthly,
+      performance:
+        monthlyBar === null ? null : classifyMonth(monthlyBar, requiredLowerBound, requiredUpperBound),
+      isBestMonth: i === bestMonthIndex,
       isOnTrack,
     });
   }

@@ -40,6 +40,14 @@
   --status-over: #2563eb;
   --status-over-bg: #eff6ff;
 
+  /* Goal-trend chart: a month against the required monthly average.
+     Same traffic light as above, re-stepped so red/green stay apart under
+     deuteranopia (ΔE 11.0) and every fill clears 3:1 on the white card. */
+  --chart-below: #b91c1c;
+  --chart-on-target: #16a34a;
+  --chart-above: #2563eb;
+  --chart-reference: #334155;
+
   /* Pill active: dark background */
   --pill-active-bg: #111827;
 }
