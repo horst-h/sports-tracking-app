@@ -241,6 +241,47 @@ describe("goals sync across devices", () => {
     expect(backend.get(backendKey(YEAR, "run"))).toMatchObject({ distanceKm: 1103 });
   });
 
+  it("takes the backend's values when the cache disagrees with the version it claims", async () => {
+    // Two devices sat on different numbers indefinitely: neither had a pending
+    // edit, both believed they were current, and reconciliation compared only
+    // `updatedAt` against `syncedAt` — never the values themselves. A device
+    // claiming to be in sync was simply believed.
+    on("desktop");
+    await saveGoals(YEAR, goalsFor({ run: { distanceKm: 1103, count: 111 } }));
+
+    // The values drift out from under a sync state that still looks settled.
+    const doc = store.get(YEAR) as { goals: { perSport: Record<string, unknown> } };
+    doc.goals.perSport.run = { distanceKm: 999 };
+    store.set(YEAR, doc);
+
+    const fresh = vi.fn();
+    await loadGoals(YEAR, fresh);
+    await settle();
+
+    expect(fresh).toHaveBeenCalledOnce();
+    expect(await loadGoals(YEAR)).toMatchObject({
+      perSport: { run: { distanceKm: 1103, count: 111 } },
+    });
+  });
+
+  it("still lets a pending local edit win over a cache that merely looks stale", async () => {
+    // The repair must not outrank a real intention: an edit this device made
+    // and could not send is not a broken cache, and has to go out rather than
+    // be overwritten by the value it is meant to replace.
+    on("desktop");
+    await saveGoals(YEAR, goalsFor({ run: { distanceKm: 1103 } }));
+
+    reachable = false;
+    await saveGoals(YEAR, goalsFor({ run: { distanceKm: 1200 } }));
+    reachable = true;
+
+    await loadGoals(YEAR);
+    await settle();
+
+    expect(backend.get(backendKey(YEAR, "run"))).toMatchObject({ distanceKm: 1200 });
+    expect(await loadGoals(YEAR)).toMatchObject({ perSport: { run: { distanceKm: 1200 } } });
+  });
+
   it("syncs swimming goals", async () => {
     on("desktop");
     await saveGoals(YEAR, goalsFor({ swim: { distanceKm: 40, count: 60 } }));

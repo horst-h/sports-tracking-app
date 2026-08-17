@@ -316,8 +316,23 @@ async function revalidate(year: number, cached: CachedGoals | null): Promise<Rev
     const state = sync[sport] ?? {};
     const remoteMoved = !!remote && remote.updatedAt !== state.syncedAt;
 
+    const remoteValues = remote ? goalDataOf(remote) : null;
+    /**
+     * We claim to be in sync with this exact record and do not hold its values.
+     *
+     * That is not a conflict to resolve, it is a broken cache: whatever wrote
+     * it wrote values and a `syncedAt` that never belonged together. Deciding
+     * this on the timestamp alone is what let two devices sit on different
+     * numbers indefinitely — neither had a pending edit, both believed they
+     * were current, and nothing ever compared what they actually held.
+     */
+    const disagreesWhileClaimingToAgree =
+      !!remoteValues && !remoteMoved && !sameGoalData(merged.perSport[sport], remoteValues);
+
     // An edit that never left this device, and nobody else has written since:
-    // send it now rather than letting it sit here looking synced.
+    // send it now rather than letting it sit here looking synced. Checked
+    // first, because a pending edit is a real intention and outranks a cache
+    // that merely looks wrong.
     if (state.dirty && !remoteMoved) {
       const pushed = await pushSport(year, sport, merged.perSport[sport]);
       if (pushed) {
@@ -328,16 +343,18 @@ async function revalidate(year: number, cached: CachedGoals | null): Promise<Rev
       continue;
     }
 
-    if (remoteMoved) {
+    if (remoteMoved || disagreesWhileClaimingToAgree) {
       // Written elsewhere after we last looked, so it wins — including over a
       // local edit that never made it out, which would otherwise resurrect an
       // older value on every device it touches.
       if (state.dirty) {
         console.warn(`[GoalsRepository] Dropping unpushed ${sport} edit; backend is newer`);
       }
-      const values = goalDataOf(remote!);
-      if (!sameGoalData(merged.perSport[sport], values)) {
-        merged.perSport[sport] = values;
+      if (disagreesWhileClaimingToAgree) {
+        console.warn(`[GoalsRepository] Local ${sport} goal disagreed with the record it claimed to be synced with; taking the backend's`);
+      }
+      if (!sameGoalData(merged.perSport[sport], remoteValues!)) {
+        merged.perSport[sport] = remoteValues!;
         changed = true;
       }
       sync[sport] = { syncedAt: remote!.updatedAt };
