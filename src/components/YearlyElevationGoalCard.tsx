@@ -104,7 +104,7 @@ export default function YearlyElevationGoalCard({ sport, stats, forecast }: Prop
               </div>
               <div className="forecast-metric-compact">
                 <span className="forecast-label">
-                  {forecast.daysAhead < 0 ? "Required pace" : "Trend"}
+                  {forecast.daysAhead < 0 ? "Required pace" : "Avg pace"}
                 </span>
                 <span className="forecast-value">
                   {(forecast.daysAhead < 0 ? forecast.requiredPerWeek : forecast.trendPerWeek).toFixed(0)} m/week

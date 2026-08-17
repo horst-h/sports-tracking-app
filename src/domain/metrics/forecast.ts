@@ -50,10 +50,22 @@ function daysInYear(year: number): number {
   return leap ? 366 : 365;
 }
 
+/**
+ * Counted in calendar days, not in elapsed milliseconds.
+ *
+ * Subtracting two local timestamps and dividing by 86,400,000 is a day short
+ * whenever a clock change sits between them: from late March to late October,
+ * Berlin is one hour further from 1 January than whole days account for, so
+ * `Math.floor` gave 228 for 17 August until 01:00 and 229 afterwards. Small,
+ * and it moved the whole ideal line by a day for anyone opening the app early.
+ *
+ * Mapping both ends onto UTC keeps the arithmetic on calendar dates, where a
+ * day is a day regardless of what the clocks did in between.
+ */
 function getDayOfYear(date: Date): number {
-  const start = new Date(date.getFullYear(), 0, 1, 0, 0, 0, 0);
-  const diff = date.getTime() - start.getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
+  const startOfYear = Date.UTC(date.getFullYear(), 0, 1);
+  const thisDay = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.round((thisDay - startOfYear) / (1000 * 60 * 60 * 24)) + 1;
 }
 
 function round(n: number, digits = 1): number {
@@ -66,33 +78,29 @@ function clamp(n: number, min = 0, max = Infinity): number {
 }
 
 // Trend calculation from last 30 calendar days (average per calendar day, not per training day)
-function calculateTrendPerDay(params: {
-  dailySeries?: DailyDataPoint[];
-  currentValue: number;
-  dayOfYear: number;
-  lookbackDays?: number;
-}): number {
-  const { dailySeries, currentValue, dayOfYear, lookbackDays = 30 } = params;
-
-  if (!dailySeries || dailySeries.length < 7) {
-    // Fallback: YTD average per calendar day
-    return dayOfYear > 0 ? currentValue / dayOfYear : 0;
-  }
-
-  const today = new Date();
-  const cutoffDate = new Date(today);
-  cutoffDate.setDate(cutoffDate.getDate() - lookbackDays);
-  const cutoffIso = cutoffDate.toISOString().split("T")[0];
-
-  const recentPoints = dailySeries.filter((p) => p.date >= cutoffIso);
-  if (recentPoints.length === 0) {
-    // No recent data: use YTD average per calendar day
-    return dayOfYear > 0 ? currentValue / dayOfYear : 0;
-  }
-
-  // Average per calendar day in last 30 days (divide by calendar days, not training days)
-  const recentSum = recentPoints.reduce((acc, p) => acc + p.value, 0);
-  return recentSum / lookbackDays;
+/**
+ * The pace this card projects with: the year's average per calendar day.
+ *
+ * It used to be the last 30 days, and the card had no single answer as a
+ * result. The status pill and the end-of-year figure ran on recent form while
+ * the projected completion date and the days-ahead delta ran on the year's
+ * average, so a card could read "On Track", "10100 m by 31 Dec" and "goal
+ * reached 13 Jan 2027" all at once, each of them correct on its own terms.
+ *
+ * One rate removes the contradiction outright rather than papering over it.
+ * Being on track means the year's pace covers what is left, and that is the
+ * same statement as "not behind the straight line to the goal" — algebraically
+ * the same, so the pill and the delta can no longer disagree:
+ *
+ *   c/d ≥ (G−c)/(L−d)   ⟺   c·L ≥ G·d   ⟺   c ≥ G·(d/L)
+ *   ^ pace covers the rest                    ^ at or above the ideal today
+ *
+ * The cost is deliberate: a strong month barely moves the projection, and a
+ * quiet one barely dents it. That is what a year-to-date average is for.
+ */
+function calculateTrendPerDay(params: { currentValue: number; dayOfYear: number }): number {
+  const { currentValue, dayOfYear } = params;
+  return dayOfYear > 0 ? currentValue / dayOfYear : 0;
 }
 
 // Generate 12 monthly points for sparkline data
@@ -174,35 +182,23 @@ export function calculateForecast(input: ForecastInput): ForecastResult {
       ? `${Math.round(daysAhead)} days ahead`
       : `${Math.round(Math.abs(daysAhead))} days behind`;
 
-  const trendPerDay = calculateTrendPerDay({
-    dailySeries,
-    currentValue,
-    dayOfYear,
-    lookbackDays: 30,
-  });
+  const trendPerDay = calculateTrendPerDay({ currentValue, dayOfYear });
 
   const trendPerWeek = round(trendPerDay * 7, 2);
 
   const daysLeft = yearLen - dayOfYear;
   const forecastEOY = clamp(currentValue + trendPerDay * daysLeft, 0);
 
-  // Calculate per-unit metric: avg value per activity in last 30 days
+  // Average per activity across the year, for the same reason as the pace: it
+  // sits unlabelled beside figures that are all year-to-date, and a 30-day
+  // window there was one more number quietly measuring something else.
   let perUnit: number | undefined;
   if (dailySeries && dailySeries.length > 0 && activityCountByDay && activityCountByDay.length > 0) {
-    const cutoffDate = new Date(today);
-    cutoffDate.setDate(cutoffDate.getDate() - 30);
-    const cutoffIso = cutoffDate.toISOString().split("T")[0];
+    const metricSum = dailySeries.reduce((sum, p) => sum + p.value, 0);
+    const activityCount = activityCountByDay.reduce((sum, p) => sum + p.value, 0);
 
-    const last30MetricSum = dailySeries
-      .filter((p) => p.date >= cutoffIso)
-      .reduce((sum, p) => sum + p.value, 0);
-
-    const last30ActivityCount = activityCountByDay
-      .filter((p) => p.date >= cutoffIso)
-      .reduce((sum, p) => sum + p.value, 0);
-
-    if (last30ActivityCount > 0) {
-      perUnit = round(last30MetricSum / last30ActivityCount, 2);
+    if (activityCount > 0) {
+      perUnit = round(metricSum / activityCount, 2);
     }
   }
 
