@@ -71,9 +71,30 @@ export class NetlifyBlobsGoalsStore implements GoalsStore {
     if (siteID && token) {
       console.info("[NetlifyBlobsGoalsStore] Using explicit BLOBS_* credentials");
       this.store = getStore("goals", { siteID, token });
-    } else {
-      console.info("[NetlifyBlobsGoalsStore] Using the runtime Blobs context");
+      return;
+    }
+
+    try {
       this.store = getStore("goals");
+      console.info("[NetlifyBlobsGoalsStore] Using the runtime Blobs context");
+    } catch (error) {
+      // "The environment has not been configured" says nothing about which half
+      // is missing, and the answer decides the remedy: a runtime that injects no
+      // context needs a different function type, while a runtime that injects one
+      // that does not work needs something else entirely. Presence only — none of
+      // these values may be logged.
+      console.error(
+        "[NetlifyBlobsGoalsStore] No usable Blobs context. Present:",
+        JSON.stringify({
+          NETLIFY_BLOBS_CONTEXT: !!process.env.NETLIFY_BLOBS_CONTEXT,
+          SITE_ID: !!process.env.SITE_ID,
+          DEPLOY_ID: !!process.env.DEPLOY_ID,
+          NETLIFY: !!process.env.NETLIFY,
+          BLOBS_SITE_ID: !!siteID,
+          BLOBS_TOKEN: !!token,
+        })
+      );
+      throw error;
     }
   }
 
