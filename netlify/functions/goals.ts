@@ -80,6 +80,19 @@ export const handler: Handler = async (event) => {
 
   console.info(`[Goals API] Incoming ${event.httpMethod} request`);
 
+  // TEMPORARY: reported before the auth gate so it can be triggered without a
+  // session. Removed once the Blobs context question is settled. Presence only.
+  console.info(
+    "[Goals API] blobs env:",
+    JSON.stringify({
+      NETLIFY_BLOBS_CONTEXT: !!process.env.NETLIFY_BLOBS_CONTEXT,
+      SITE_ID: !!process.env.SITE_ID,
+      DEPLOY_ID: !!process.env.DEPLOY_ID,
+      NETLIFY: !!process.env.NETLIFY,
+      AWS_LAMBDA_FUNCTION_NAME: !!process.env.AWS_LAMBDA_FUNCTION_NAME,
+    })
+  );
+
   const auth = await requireIdentity(event.headers);
   if (!auth.ok) {
     console.warn(`[Goals API] Rejected: ${auth.error}`);
