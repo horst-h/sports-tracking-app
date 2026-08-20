@@ -1,13 +1,32 @@
-import type { Handler } from "@netlify/functions";
+import type { Context } from "@netlify/functions";
 import { requireIdentity } from "./_lib/identity";
 import { createGoalsStore } from "./_lib/goalsStore";
 import type { Sport, GoalData, StoredGoal } from "./_lib/types";
 
+/**
+ * Written against the current Functions runtime, not the Lambda-compatible one.
+ *
+ * That is not a style preference. Netlify hands a function its Blobs context
+ * through `NETLIFY_BLOBS_CONTEXT`, and the legacy runtime this used to run on
+ * does not set it — measured, not assumed: a request there reports
+ * `NETLIFY_BLOBS_CONTEXT: false`, `NETLIFY: false`, `DEPLOY_ID: false` and
+ * `AWS_LAMBDA_FUNCTION_NAME: true`. So `getStore("goals")` had nothing to work
+ * with and every request answered 503.
+ *
+ * The previous author's workaround was a personal access token in the site
+ * environment, which is what expired and started this whole outage. Moving the
+ * function to the runtime that provides a context is the way to need no
+ * credential at all.
+ *
+ * The URL is unchanged: a default-export function is still served from
+ * /.netlify/functions/goals, so nothing on the client moves.
+ */
+
 const ALLOWED_SPORTS: Sport[] = ["run", "ride", "swim"];
 
-function json(statusCode: number, body: unknown) {
-  return {
-    statusCode,
+function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
     headers: {
       "content-type": "application/json",
       "cache-control": "no-store",
@@ -15,8 +34,7 @@ function json(statusCode: number, body: unknown) {
       "access-control-allow-methods": "GET, PUT, DELETE, OPTIONS",
       "access-control-allow-headers": "Authorization, Content-Type",
     },
-    body: JSON.stringify(body),
-  };
+  });
 }
 
 function isValidSport(sport: unknown): sport is Sport {
@@ -38,9 +56,9 @@ function parseYear(value: unknown): number | null {
   return null;
 }
 
-function validateGoalData(data: any): GoalData | null {
+function validateGoalData(data: Record<string, unknown>): GoalData | null {
   const goal: GoalData = {};
-  
+
   if (data.distanceKm !== undefined) {
     if (typeof data.distanceKm === "number" && data.distanceKm >= 0) {
       goal.distanceKm = data.distanceKm;
@@ -48,7 +66,7 @@ function validateGoalData(data: any): GoalData | null {
       return null;
     }
   }
-  
+
   if (data.count !== undefined) {
     if (typeof data.count === "number" && data.count >= 0 && Number.isInteger(data.count)) {
       goal.count = data.count;
@@ -56,7 +74,7 @@ function validateGoalData(data: any): GoalData | null {
       return null;
     }
   }
-  
+
   if (data.elevationM !== undefined) {
     if (typeof data.elevationM === "number" && data.elevationM >= 0) {
       goal.elevationM = data.elevationM;
@@ -64,7 +82,7 @@ function validateGoalData(data: any): GoalData | null {
       return null;
     }
   }
-  
+
   return goal;
 }
 
@@ -72,28 +90,16 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-export const handler: Handler = async (event) => {
-  // CORS preflight
-  if (event.httpMethod === "OPTIONS") {
-    return json(200, {});
-  }
+export default async function handler(req: Request, _context: Context): Promise<Response> {
+  if (req.method === "OPTIONS") return json(200, {});
 
-  console.info(`[Goals API] Incoming ${event.httpMethod} request`);
+  console.info(`[Goals API] Incoming ${req.method} request`);
 
-  // TEMPORARY: reported before the auth gate so it can be triggered without a
-  // session. Removed once the Blobs context question is settled. Presence only.
-  console.info(
-    "[Goals API] blobs env:",
-    JSON.stringify({
-      NETLIFY_BLOBS_CONTEXT: !!process.env.NETLIFY_BLOBS_CONTEXT,
-      SITE_ID: !!process.env.SITE_ID,
-      DEPLOY_ID: !!process.env.DEPLOY_ID,
-      NETLIFY: !!process.env.NETLIFY,
-      AWS_LAMBDA_FUNCTION_NAME: !!process.env.AWS_LAMBDA_FUNCTION_NAME,
-    })
-  );
+  // Header names arrive lowercased here; headerOf compares case-insensitively
+  // either way, so the identity check does not care which runtime it is on.
+  const headers = Object.fromEntries(req.headers) as Record<string, string | undefined>;
 
-  const auth = await requireIdentity(event.headers);
+  const auth = await requireIdentity(headers);
   if (!auth.ok) {
     console.warn(`[Goals API] Rejected: ${auth.error}`);
     return json(auth.status, { error: auth.error });
@@ -103,7 +109,7 @@ export const handler: Handler = async (event) => {
   console.info(`[Goals API] Authenticated subject: ${subject}`);
 
   try {
-    return await handleRequest(event, subject);
+    return await handleRequest(req, subject);
   } catch (error) {
     // A storage failure is ours, and it is temporary. It must never leave here
     // as 200 with an empty answer: the clients treat "no goal" as fact and
@@ -112,18 +118,16 @@ export const handler: Handler = async (event) => {
     console.error("[Goals API] Storage unavailable:", error);
     return json(503, { error: "storage_unavailable" });
   }
-};
+}
 
-async function handleRequest(
-  event: Parameters<Handler>[0],
-  subject: string
-): Promise<{ statusCode: number; headers: Record<string, string>; body: string }> {
+async function handleRequest(req: Request, subject: string): Promise<Response> {
   const store = createGoalsStore();
+  const params = new URL(req.url).searchParams;
 
   // GET: Retrieve a goal
-  if (event.httpMethod === "GET") {
-    const yearParam = event.queryStringParameters?.year;
-    const sportParam = event.queryStringParameters?.sport;
+  if (req.method === "GET") {
+    const yearParam = params.get("year");
+    const sportParam = params.get("sport");
 
     const year = parseYear(yearParam);
     if (!year) {
@@ -143,10 +147,10 @@ async function handleRequest(
   }
 
   // PUT: Create or update a goal
-  if (event.httpMethod === "PUT") {
-    let body: any;
+  if (req.method === "PUT") {
+    let body: Record<string, unknown>;
     try {
-      body = JSON.parse(event.body || "{}");
+      body = (await req.json()) as Record<string, unknown>;
     } catch {
       console.warn("[Goals API] Invalid JSON in request body");
       return json(400, { error: "invalid_json" });
@@ -169,7 +173,10 @@ async function handleRequest(
       return json(400, { error: "invalid_goal_data" });
     }
 
-    console.info(`[Goals API] Saving goal: subject=${subject}, year=${year}, sport=${body.sport}`, goalData);
+    console.info(
+      `[Goals API] Saving goal: subject=${subject}, year=${year}, sport=${body.sport}`,
+      goalData
+    );
 
     // Load existing or create new
     const existing = await store.get(subject, year, body.sport);
@@ -191,9 +198,9 @@ async function handleRequest(
   }
 
   // DELETE: Remove a goal
-  if (event.httpMethod === "DELETE") {
-    const yearParam = event.queryStringParameters?.year;
-    const sportParam = event.queryStringParameters?.sport;
+  if (req.method === "DELETE") {
+    const yearParam = params.get("year");
+    const sportParam = params.get("sport");
 
     const year = parseYear(yearParam);
     if (!year) {
@@ -212,6 +219,6 @@ async function handleRequest(
     return json(200, { ok: deleted });
   }
 
-  console.warn(`[Goals API] Unsupported HTTP method: ${event.httpMethod}`);
+  console.warn(`[Goals API] Unsupported HTTP method: ${req.method}`);
   return json(405, { error: "method_not_allowed" });
 }
