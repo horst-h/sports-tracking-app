@@ -1,5 +1,6 @@
 import type { AggregateYear } from "./types";
 import type { GoalMetric, Sport } from "./types";
+import { formatDate } from "../../utils/format";
 
 export type ForecastMode = "ytd" | "rolling28" | "blend";
 
@@ -109,7 +110,7 @@ function buildProgress(params: {
     if (perWeek > 0 && toVictory > 0) {
       reachedInWeeks = toVictory / perWeek;
       const reachedDate = addDays(asOf, reachedInWeeks * 7);
-      reachedOnLocal = reachedDate.toDateString();
+      reachedOnLocal = formatDate(reachedDate);
     }
   }
 

@@ -2,7 +2,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useMemo } from 'react';
 import { useActivities } from '../hooks/useActivities';
-import { useAthlete } from '../hooks/useAthlete';
 import { useDataAccess } from '../hooks/useDataAccess';
 import { buildUiAthleteStats } from '../domain/metrics/uiStats';
 import { aggregateYear } from '../domain/metrics/aggregate';
@@ -64,7 +63,6 @@ export default function AnalyzePage() {
   const routeOk = !!isValidSport && !!isValidMetric;
   const enabled = ready && routeOk;
   const { activities, loading: activitiesLoading } = useActivities(year, enabled);
-  useAthlete(enabled); // Ensure athlete is loaded but not directly used
   const { goals } = useGoals(year, ready);
 
   // Build UI stats with same logic as App.tsx

@@ -123,7 +123,7 @@ describe("buildUiAthleteStats — ytd mode", () => {
       toVictory: 1122.4,
       reachable: false,
       reachedInWeeks: 469.99,
-      reachedOnLocal: "Thu Aug 17 2034",
+      reachedOnLocal: "Aug 17, 2034",
     });
   });
 
@@ -137,7 +137,7 @@ describe("buildUiAthleteStats — ytd mode", () => {
       toVictory: 93,
       reachable: false,
       reachedInWeeks: 431.71,
-      reachedOnLocal: "Tue Nov 22 2033",
+      reachedOnLocal: "Nov 22, 2033",
     });
   });
 
@@ -151,7 +151,7 @@ describe("buildUiAthleteStats — ytd mode", () => {
       toVictory: 7230,
       reachable: false,
       reachedInWeeks: 305.11,
-      reachedOnLocal: "Fri Jun 20 2031",
+      reachedOnLocal: "Jun 20, 2031",
     });
   });
 });
