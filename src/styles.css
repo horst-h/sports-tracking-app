@@ -47,6 +47,9 @@
   --chart-on-target: #16a34a;
   --chart-above: #2563eb;
   --chart-reference: #334155;
+  /* A month that has started but cannot yet be judged. Deliberately outside the
+     traffic light: it is an absence of a verdict, not a middling one. */
+  --chart-pending: #94a3b8;
 
   /* Pill active: dark background */
   --pill-active-bg: #111827;

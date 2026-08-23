@@ -20,6 +20,16 @@ export type GoalTrendChartData = {
   month: string;
   monthIndex: number;
   monthlyActual: number | null;
+  /** Where the month lands at its current pace. Equals the actual once it is over. */
+  projectedMonthly: number | null;
+  /** What the bar reaches: the projection, with the actual drawn solid inside it. */
+  barTop: number | null;
+  /** True for the running month of the current year, and only then. */
+  isInProgress: boolean;
+  /** Fraction of the month already behind us; 1 for any finished month. */
+  monthProgress: number;
+  daysInMonth: number;
+  dayOfMonth: number;
   /** The pace that reaches the yearly goal (goal / 12). */
   requiredAvgMonthly: number;
   requiredLowerBound: number;
@@ -51,6 +61,9 @@ const PERFORMANCE_LABEL: Record<MonthPerformance, string> = {
 
 const REQUIRED_LINE_COLOR = "var(--chart-reference)";
 
+/** A month that has started but is too young to extrapolate from. */
+const PENDING_COLOR = "var(--chart-pending)";
+
 const BADGE_RADIUS = 11;
 /** Vertical gap between the top of the best bar and the badge. */
 const BADGE_GAP = 7;
@@ -73,21 +86,66 @@ function BestMonthBadge({ cx, cy }: { cx: number; cy: number }) {
   );
 }
 
-/** Monthly bar: tinted by how the month compares to the required average, badged when it is the best one. */
+/** How solid the projected part of a running month is drawn. */
+const PROJECTION_OPACITY = 0.3;
+
+/**
+ * Monthly bar: tinted by how the month rates against the required average,
+ * badged when it is the best one.
+ *
+ * A running month is drawn twice. The bar reaches its projection, faintly, and
+ * the part actually completed sits inside it solid — so the month reads as
+ * unfinished rather than as bad, which is what a single bar cut off partway
+ * through inevitably looked like.
+ */
 function MonthBar(props: RectangleProps & { payload?: GoalTrendChartData }) {
   const { payload, ...rect } = props;
 
-  // Months that have not happened yet carry no rating and get no bar.
+  // Months that have not happened yet get no bar at all. A month that has
+  // started always gets one, rated or not — monthlyActual is what separates the
+  // two, since performance is null in both cases.
+  const actual = payload?.monthlyActual;
+  if (actual === null || actual === undefined) return <g />;
+
   const performance = payload?.performance;
-  if (!performance) return <g />;
+  const color = performance ? PERFORMANCE_COLOR[performance] : PENDING_COLOR;
 
   const x = Number(rect.x ?? 0);
   const y = Number(rect.y ?? 0);
   const width = Number(rect.width ?? 0);
+  const height = Number(rect.height ?? 0);
+
+  const projected = payload?.projectedMonthly;
+  // The bar spans 0..projected, so the completed share of it is the same share
+  // of its height. Guarded because a month with nothing in it has no height.
+  const completedRatio = projected && projected > 0 ? Math.min(1, actual / projected) : 1;
+  const completedHeight = height * completedRatio;
+
+  const showProjection =
+    !!payload?.isInProgress && projected !== null && height - completedHeight > 0.5;
 
   return (
     <g>
-      <Rectangle {...rect} fill={PERFORMANCE_COLOR[performance]} radius={[8, 8, 0, 0]} />
+      {showProjection ? (
+        <>
+          <Rectangle
+            {...rect}
+            fill={color}
+            fillOpacity={PROJECTION_OPACITY}
+            radius={[8, 8, 0, 0]}
+          />
+          <Rectangle
+            x={x}
+            y={y + height - completedHeight}
+            width={width}
+            height={completedHeight}
+            fill={color}
+            radius={[0, 0, 0, 0]}
+          />
+        </>
+      ) : (
+        <Rectangle {...rect} fill={color} radius={[8, 8, 0, 0]} />
+      )}
       {payload?.isBestMonth && (
         <BestMonthBadge cx={x + width / 2} cy={y - BADGE_GAP - BADGE_RADIUS} />
       )}
@@ -119,6 +177,11 @@ function CustomTooltip({
     >
       <div style={{ fontWeight: 700, marginBottom: 8 }}>
         {dataPoint.month}
+        {dataPoint.isInProgress && (
+          <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 500, color: "var(--text-muted)" }}>
+            · in progress, day {dataPoint.dayOfMonth} of {dataPoint.daysInMonth}
+          </span>
+        )}
         {dataPoint.isBestMonth && (
           <span style={{ marginLeft: 6, fontSize: 11, color: "var(--text-muted)" }}>
             ★ Best month
@@ -128,9 +191,31 @@ function CustomTooltip({
 
       {dataPoint.monthlyActual !== null && (
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
-          Actual:{" "}
+          {dataPoint.isInProgress ? "So far:" : "Actual:"}{" "}
           <span style={{ color: "var(--text)", fontWeight: 600 }}>
             {formatValue(dataPoint.monthlyActual)}
+          </span>
+          {!dataPoint.isInProgress && dataPoint.performance && (
+            <span
+              style={{
+                marginLeft: 6,
+                color: PERFORMANCE_COLOR[dataPoint.performance],
+                fontWeight: 600,
+              }}
+            >
+              {PERFORMANCE_LABEL[dataPoint.performance]}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* The rating belongs to the projection for a running month, so it is
+          shown on the line the rating actually refers to. */}
+      {dataPoint.isInProgress && dataPoint.projectedMonthly !== null && (
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
+          At this pace:{" "}
+          <span style={{ color: "var(--text)", fontWeight: 600 }}>
+            {formatValue(dataPoint.projectedMonthly)}
           </span>
           {dataPoint.performance && (
             <span
@@ -143,6 +228,15 @@ function CustomTooltip({
               {PERFORMANCE_LABEL[dataPoint.performance]}
             </span>
           )}
+        </div>
+      )}
+
+      {/* Too early to extrapolate: a fortnight's worth of nothing is not the
+          same claim as "this month ends at nothing", and one big day early on
+          is not a month of them either. */}
+      {dataPoint.isInProgress && dataPoint.projectedMonthly === null && (
+        <div style={{ fontSize: 12, color: PENDING_COLOR, fontWeight: 600, marginBottom: 4 }}>
+          Too early in the month to rate
         </div>
       )}
 
@@ -242,6 +336,7 @@ export default function GoalTrendChartCore({
   const actualLineColor = isOnTrack ? "var(--chart-on-target)" : "var(--chart-below)";
 
   const bestMonth = data.find((point) => point.isBestMonth);
+  const runningMonth = data.find((point) => point.isInProgress && point.monthlyActual !== null);
 
   return (
     <div style={{ marginTop: 16 }}>
@@ -277,7 +372,7 @@ export default function GoalTrendChartCore({
 
             {/* Monthly bars, coloured by how the month rates against the required average */}
             <Bar
-              dataKey="monthlyActual"
+              dataKey="barTop"
               name="Actual"
               shape={<MonthBar />}
               isAnimationActive={false}
@@ -337,6 +432,32 @@ export default function GoalTrendChartCore({
             Above Ø (&gt; {formatValue(requiredUpperBound)})
           </LegendItem>
         </div>
+
+        {runningMonth && (
+          <div style={legendRowStyle}>
+            <LegendItem
+              swatch={
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 3,
+                    background: runningMonth.performance
+                      ? PERFORMANCE_COLOR[runningMonth.performance]
+                      : PENDING_COLOR,
+                    opacity: runningMonth.performance ? PROJECTION_OPACITY : 1,
+                    flexShrink: 0,
+                  }}
+                />
+              }
+            >
+              {runningMonth.performance
+                ? `${runningMonth.month} is still running — solid is done, pale is where it lands at this pace`
+                : `${runningMonth.month} has only just started — shown, but too early to rate`}
+            </LegendItem>
+          </div>
+        )}
 
         {bestMonth && bestMonth.monthlyActual !== null && (
           <div style={legendRowStyle}>
