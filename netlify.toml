@@ -3,6 +3,8 @@
   publish = "dist"
 
 # Ignore these keys from secrets scan:
+# - GEMINI_API_KEY (server-side only, read by netlify/functions/_lib/llm.ts;
+#   listed because the scanner otherwise flags it and blocks the build)
 # - STRAVA_CLIENT_SECRET / STRAVA_CLIENT_ID (server-side only, still read by
 #   oauth-refresh; nothing Strava reaches the bundle any more)
 # - VITE_GOOGLE_CLIENT_ID / GOOGLE_CLIENT_ID (same value, and an OAuth client ID
@@ -12,7 +14,7 @@
 # RUNALYZE_API_TOKEN is deliberately NOT listed: it must never reach the bundle,
 # so if the scanner ever finds it, the build should fail.
 [build.environment]
-  SECRETS_SCAN_OMIT_KEYS = "STRAVA_CLIENT_SECRET,STRAVA_CLIENT_ID,OPENAI_API_KEY,VITE_GOOGLE_CLIENT_ID,GOOGLE_CLIENT_ID"
+  SECRETS_SCAN_OMIT_KEYS = "STRAVA_CLIENT_SECRET,STRAVA_CLIENT_ID,GEMINI_API_KEY,VITE_GOOGLE_CLIENT_ID,GOOGLE_CLIENT_ID"
 
 [functions]
   directory = "netlify/functions"

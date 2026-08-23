@@ -1,5 +1,6 @@
 import type { Handler } from "@netlify/functions";
 import { requireIdentity } from "./_lib/identity";
+import { generateJson } from "./_lib/llm";
 
 type CoachInput = {
   year: number;
@@ -243,11 +244,6 @@ export const handler: Handler = async (event) => {
       return { statusCode: auth.status, body: JSON.stringify({ error: auth.error }) };
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return { statusCode: 500, body: "Missing OPENAI_API_KEY" };
-    }
-
     const body = JSON.parse(event.body || "{}");
     const { input, multiCategory } = body;
     
@@ -318,34 +314,16 @@ export const handler: Handler = async (event) => {
       ].join("\n");
     }
 
-    const model = "gpt-4o-mini";
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.9,
-      }),
+    const result = await generateJson({
+      system,
+      user,
+      temperature: 0.9,
+      label: "goalCoach",
     });
-
-    if (!resp.ok) {
-      const t = await resp.text();
-      return { statusCode: resp.status, body: t };
+    if (!result.ok) {
+      return { statusCode: result.status, body: result.error };
     }
-
-    const data = await resp.json();
-    const outputText = data.choices?.[0]?.message?.content ?? null;
-    if (!outputText) {
-      return { statusCode: 500, body: "No content in response" };
-    }
+    const outputText = result.text;
 
     let parsed: unknown;
     try {

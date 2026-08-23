@@ -1,5 +1,6 @@
 import type { Handler } from "@netlify/functions";
 import { requireIdentity } from "./_lib/identity";
+import { generateJson } from "./_lib/llm";
 
 type AnalyzeFacts = {
   sport: "run" | "ride";
@@ -92,12 +93,6 @@ export const handler: Handler = async (event) => {
       return { statusCode: auth.status, body: JSON.stringify({ error: auth.error }) };
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      console.log("[DEBUG] OPENAI_API_KEY missing");
-      return { statusCode: 500, body: "Missing OPENAI_API_KEY" };
-    }
-
     const { facts } = JSON.parse(event.body || "{}");
     if (!isValidFacts(facts)) {
       console.log("[DEBUG] Invalid facts structure");
@@ -184,45 +179,19 @@ export const handler: Handler = async (event) => {
       `{"headline": "... (AI)", "paragraph": "...", "bullets": ["...","..."], "toneTag": "on_track|close|off_track"}`
     ].filter(Boolean).join("\n");
 
-    const model = "gpt-4o-mini";
-    console.log("[DEBUG] Calling OpenAI model:", model);
     console.log("[DEBUG] Time context:", { todayISO, dayOfYear, totalDaysInYear, expectedProgressPercent, actualProgressPercent });
     console.log("[DEBUG] Cross-sport context:", facts.otherSport ? `${facts.otherSport.sport} at ${facts.otherSport.progressPercent}%` : "none");
-    const startTime = Date.now();
 
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 1,
-      }),
+    const result = await generateJson({
+      system,
+      user,
+      temperature: 1,
+      label: "analyzeNarrative",
     });
-
-    const durationMs = Date.now() - startTime;
-    console.log("[DEBUG] OpenAI API response received in", durationMs, "ms");
-
-    if (!resp.ok) {
-      const t = await resp.text();
-      console.log("[DEBUG] OpenAI error response:", resp.status, t);
-      return { statusCode: resp.status, body: t };
+    if (!result.ok) {
+      return { statusCode: result.status, body: result.error };
     }
-
-    const data = await resp.json();
-    const outputText = data.choices?.[0]?.message?.content ?? null;
-
-    if (!outputText) {
-      console.log("[DEBUG] No content in OpenAI response");
-      return { statusCode: 500, body: "No content in response" };
-    }
+    const { text: outputText, model, durationMs } = result;
 
     let parsed: AnalyzeNarrative;
     try {
