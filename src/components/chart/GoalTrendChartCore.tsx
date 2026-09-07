@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Crown } from "lucide-react";
 import {
   Bar,
   CartesianGrid,
@@ -65,6 +66,8 @@ const REQUIRED_LINE_COLOR = "var(--chart-reference)";
 const PENDING_COLOR = "var(--chart-pending)";
 
 const BADGE_RADIUS = 11;
+/** Sized to sit inside the badge circle with a little air around it. */
+const BADGE_ICON_SIZE = 13;
 /** Vertical gap between the top of the best bar and the badge. */
 const BADGE_GAP = 7;
 
@@ -72,16 +75,11 @@ function BestMonthBadge({ cx, cy }: { cx: number; cy: number }) {
   return (
     <g>
       <circle cx={cx} cy={cy} r={BADGE_RADIUS} fill="var(--pill-active-bg)" />
-      <text
-        x={cx}
-        y={cy}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={12}
-        fill="#ffffff"
-      >
-        ★
-      </text>
+      {/* Lucide draws from its own origin, so centre it by hand rather than
+          relying on text baselines the way the glyph this replaced did. */}
+      <g transform={`translate(${cx - BADGE_ICON_SIZE / 2}, ${cy - BADGE_ICON_SIZE / 2})`}>
+        <Crown size={BADGE_ICON_SIZE} color="#ffffff" strokeWidth={2.5} />
+      </g>
     </g>
   );
 }
@@ -183,8 +181,18 @@ function CustomTooltip({
           </span>
         )}
         {dataPoint.isBestMonth && (
-          <span style={{ marginLeft: 6, fontSize: 11, color: "var(--text-muted)" }}>
-            ★ Best month
+          <span
+            style={{
+              marginLeft: 6,
+              fontSize: 11,
+              color: "var(--text-muted)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+            }}
+          >
+            <Crown size={11} strokeWidth={2.5} aria-hidden="true" />
+            Best month
           </span>
         )}
       </div>
@@ -471,14 +479,13 @@ export default function GoalTrendChartCore({
                     borderRadius: "50%",
                     background: "var(--pill-active-bg)",
                     color: "#ffffff",
-                    fontSize: 10,
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
                     flexShrink: 0,
                   }}
                 >
-                  ★
+                  <Crown size={11} strokeWidth={2.5} />
                 </span>
               }
             >
